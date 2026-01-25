@@ -1,10 +1,36 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { GalleryVerticalEnd, BookOpen, Clock, ChevronRight } from "lucide-react";
+import { GalleryVerticalEnd, BookOpen, Clock } from "lucide-react";
 import { CreateCourseFlow } from "../../components/create-course-flow";
 import { CreateCourseCard } from "@/components/create-course-card";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { prisma } from "@study-flow/db";
+import { CourseCard } from "@/components/course-card";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session) {
+        return redirect("/login");
+    }
+
+    console.log("[Dashboard] Fetching courses for User ID:", session.user.id);
+
+    const courses = await prisma.course.findMany({
+        where: {
+            userId: session.user.id
+        },
+        orderBy: {
+            createdAt: 'desc'
+        }
+    });
+
+    console.log("[Dashboard] Found courses:", courses.length);
+
     return (
         <div className="flex min-h-screen bg-background">
             {/* Sidebar - Minimalist */}
@@ -39,34 +65,13 @@ export default function DashboardPage() {
                     <CreateCourseFlow />
                 </header>
 
-                {/* Empty State / Courses List */}
+                {/* Courses List */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <CreateCourseCard />
 
-                    {/* Sample Course Card */}
-                    <div className="border border-border rounded-xl p-6 flex flex-col gap-4 hover:shadow-sm transition-all bg-card">
-                        <div className="flex justify-between items-start">
-                            <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                                <BookOpen size={20} />
-                            </div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-secondary px-2 py-1 rounded">Basics</span>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <h3 className="font-semibold text-lg">Quantum Mechanics</h3>
-                            <p className="text-sm text-muted-foreground line-clamp-2">Understanding the fundamental nature of reality at the smallest scales.</p>
-                        </div>
-                        <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
-                            <div className="flex flex-col gap-1">
-                                <div className="w-24 h-1.5 bg-secondary rounded-full overflow-hidden">
-                                    <div className="bg-primary w-1/3 h-full" />
-                                </div>
-                                <span className="text-[10px] text-muted-foreground">32% Complete</span>
-                            </div>
-                            <Button variant="ghost" size="sm" className="gap-1 text-xs">
-                                Continue <ChevronRight size={14} />
-                            </Button>
-                        </div>
-                    </div>
+                    {courses.map((course) => (
+                        <CourseCard key={course.id} course={course} />
+                    ))}
                 </div>
             </main>
         </div>

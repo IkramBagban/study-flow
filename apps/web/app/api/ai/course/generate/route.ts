@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { CourseService } from "@/lib/ai/course-service";
 import { prisma } from "@study-flow/db";
 import { z } from "zod";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 const GenerateSchema = z.object({
     topic: z.string(),
@@ -23,19 +25,15 @@ export async function POST(req: NextRequest) {
         }
 
         if (action === "course-structure") {
-            // In a real app, get session.user.id
-            // For dev/demo since DB was reset: Find first user or create a "Demo User"
-            let user = await prisma.user.findFirst();
-            if (!user) {
-                user = await prisma.user.create({
-                    data: {
-                        email: "demo@study-flow.com",
-                        name: "Demo Student",
-                    }
-                });
+            const session = await auth.api.getSession({
+                headers: await headers()
+            });
+
+            if (!session) {
+                return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
             }
 
-            const course = await CourseService.generateCourseBlueprint(user.id, topic, goal, level);
+            const course = await CourseService.generateCourseBlueprint(session.user.id, topic, goal, level);
             return NextResponse.json({ courseId: course.id });
         }
 
