@@ -57,6 +57,7 @@ export const DomainMapSchema = z.object({
     subject: z.string(),
     groups: z.array(TopicGroupSchema),
     welcomeMessage: z.string().describe("A short, engaging message setting the context for the domain map"),
+    keyConcepts: z.array(z.string()).describe("List of 5-10 key jargon/concepts in this field to check user knowledge"),
 });
 
 // 2. Micro-Concept (The Atomic Unit) - Phase C

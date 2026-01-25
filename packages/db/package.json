@@ -7,6 +7,12 @@
     ".": "./index.ts",
     "./client": "./index.ts"
   },
+  "scripts": {
+    "db:seed": "bun seed.ts"
+  },
+  "prisma": {
+    "seed": "bun seed.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "prisma": "^7.3.0"

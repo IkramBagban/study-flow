@@ -1,16 +1,12 @@
 "use client"
 
-import { useState } from "react"
 import { Plus } from "lucide-react"
-import { CreateSpaceModal } from "@/components/create-space-modal"
+import { CreateCourseFlow } from "@/components/create-course-flow"
 
 export function CreateCourseCard() {
-    const [isOpen, setIsOpen] = useState(false)
-
     return (
-        <>
+        <CreateCourseFlow trigger={
             <div
-                onClick={() => setIsOpen(true)}
                 className="group border border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center text-center gap-4 hover:border-primary/50 transition-colors cursor-pointer"
             >
                 <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
@@ -21,8 +17,6 @@ export function CreateCourseCard() {
                     <p className="text-xs text-muted-foreground">Start build deep understanding today.</p>
                 </div>
             </div>
-
-            <CreateSpaceModal isOpen={isOpen} onClose={() => setIsOpen(false)} />
-        </>
+        } />
     )
 }
