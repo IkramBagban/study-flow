@@ -4,9 +4,15 @@ import { notFound } from "next/navigation";
 import { CourseService } from "@/lib/ai/course-service";
 import { ChevronRight, PlayCircle, BookOpen, CheckCircle, BrainCircuit } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Visualizer } from "@/components/visualizer";
+
+import { ChapterContentLoader } from "@/components/chapter-content-loader";
+// ... imports
 
 export default async function ChapterPage(props: { params: Promise<{ id: string; chapterId: string }> }) {
+    console.log("[ChapterPage] Rendering...");
     const params = await props.params;
+    console.log("[ChapterPage] Params:", params);
 
     // Fetch chapter with concepts
     const chapter = await prisma.chapter.findUnique({
@@ -25,23 +31,27 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
 
     if (!chapter) notFound();
 
-    // Check if content generation is needed
-    // In a real app, this should be an async job or client-side poller.
-    // For now, we'll try to generate on-the-fly if missing (might be slow).
     const missingContent = chapter.concepts.some(c => !c.isReady);
 
     if (missingContent) {
-        try {
-            // Trigger generation (this waits, so page load will be slow first time)
-            // Ideally show a "Generating..." skeleton using Suspense or client component.
-            await CourseService.generateChapterContent(chapter.id);
-        } catch (error) {
-            console.error("Failed to generate chapter content:", error);
-            // We suppress the error so the page still loads partially
-        }
+        // If content is missing, we render the layout with a Client Component loader
+        // This makes the navigation instant, and the content loads progressively.
+        return (
+            <div className="space-y-8 animate-in fade-in duration-500">
+                <div className="border-b border-border pb-6">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                        <span>{chapter.module.course.title}</span>
+                        <ChevronRight className="size-4" />
+                        <span>{chapter.module.title}</span>
+                        <ChevronRight className="size-4" />
+                        <span className="text-foreground font-medium">{chapter.title}</span>
+                    </div>
+                    <h1 className="text-4xl font-bold">{chapter.title}</h1>
+                </div>
 
-        // Re-fetch to get updated content
-        // (In a real app, use revalidatePath)
+                <ChapterContentLoader chapterId={chapter.id} />
+            </div>
+        );
     }
 
     // optimizing re-fetch or relying on the first fetch if we assume CourseService doesn't error clearly.
@@ -130,6 +140,15 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
                                         <div className="mt-4 bg-zinc-950 rounded-lg p-4 font-mono text-sm text-blue-200 overflow-x-auto border border-white/5">
                                             {(concept.content as any).example}
                                         </div>
+                                    )}
+
+                                    {/* Visualization */}
+                                    {(concept.content as any).visual && (concept.content as any).visual.type !== 'none' && (
+                                        <Visualizer
+                                            type={(concept.content as any).visual.type}
+                                            code={(concept.content as any).visual.code}
+                                            caption={(concept.content as any).visual.caption}
+                                        />
                                     )}
                                 </div>
                             ) : (

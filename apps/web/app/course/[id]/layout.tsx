@@ -12,6 +12,7 @@ export default async function CourseLayout({
     params: Promise<{ id: string }>;
 }) {
     const params = await paramsPromise;
+    console.log(`[CourseLayout] Loading layout for course: ${params.id}`);
     const course = await prisma.course.findUnique({
         where: { id: params.id },
         include: {
@@ -25,6 +26,7 @@ export default async function CourseLayout({
             }
         }
     });
+    console.log(`[CourseLayout] Loaded course: ${course?.title}`);
 
     if (!course) notFound();
 
