@@ -15,5 +15,5 @@ if (process.env.NODE_ENV !== "development") {
     globalForPrisma.prismaClient = prismaClient;
 }
 
-export default prismaClient;
+export const prisma = prismaClient;
 // export * from "./generated/prisma/client";

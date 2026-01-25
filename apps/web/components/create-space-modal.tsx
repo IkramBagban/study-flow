@@ -1,13 +1,14 @@
+
 "use client"
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "motion/react"
-import { Search, Globe, Upload, Link2, HardDrive, FileText, X, Sparkles, Check, ChevronRight, AlertCircle } from "lucide-react"
+import { Search, Globe, Upload, Link2, HardDrive, FileText, X, Sparkles, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
-type Step = "source" | "form" | "quiz" | "results"
+type Step = "source" | "form"
 
 export function CreateSpaceModal({ isOpen = true, onClose }: { isOpen?: boolean; onClose?: () => void }) {
     const [step, setStep] = useState<Step>("source")
@@ -18,54 +19,33 @@ export function CreateSpaceModal({ isOpen = true, onClose }: { isOpen?: boolean;
         time: "15 mins",
         text: ""
     })
-    const [quizData, setQuizData] = useState<any>(null)
-    const [answers, setAnswers] = useState<Record<string, string>>({})
-    const [results, setResults] = useState<any>(null)
 
     if (!isOpen) return null
 
     const handleGenerate = async () => {
         setLoading(true)
         try {
-            const res = await fetch("/api/ai/generate-quiz", {
+            const res = await fetch("/api/ai/course/generate", {
                 method: "POST",
                 body: JSON.stringify({
                     topic: formData.topic,
-                    knowledgeLevel: formData.level,
-                    timeCommitment: formData.time,
-                    sourceText: formData.text
+                    goal: "Understand the core concepts of " + formData.topic,
+                    level: formData.level,
+                    action: "course-structure"
                 })
             })
+
+            if (!res.ok) throw new Error("Failed to generate course")
+
             const data = await res.json()
-            setQuizData(data)
-            setStep("quiz")
+
+            if (data.courseId) {
+                window.location.href = `/course/${data.courseId}`
+            }
+
         } catch (e) {
             console.error(e)
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    const handleGrade = async () => {
-        setLoading(true)
-        try {
-            const formattedAnswers = Object.entries(answers).map(([qId, oId]) => ({
-                questionId: qId,
-                selectedOptionId: oId
-            }))
-
-            const res = await fetch("/api/ai/grade-quiz", {
-                method: "POST",
-                body: JSON.stringify({
-                    questions: quizData.questions,
-                    userAnswers: formattedAnswers
-                })
-            })
-            const data = await res.json()
-            setResults(data)
-            setStep("results")
-        } catch (e) {
-            console.error(e)
+            // Ideally show error toast here
         } finally {
             setLoading(false)
         }
@@ -87,7 +67,6 @@ export function CreateSpaceModal({ isOpen = true, onClose }: { isOpen?: boolean;
                     transition={{ duration: 0.4, type: "spring", bounce: 0.2 }}
                     className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-[#0A0A0A] shadow-2xl flex flex-col max-h-[90vh]"
                 >
-                    {/* Close Button */}
                     <button
                         onClick={onClose}
                         className="absolute right-6 top-6 z-10 rounded-full p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
@@ -109,20 +88,6 @@ export function CreateSpaceModal({ isOpen = true, onClose }: { isOpen?: boolean;
                                 loading={loading}
                                 onBack={() => setStep("source")}
                             />
-                        )}
-
-                        {step === "quiz" && quizData && (
-                            <QuizStep
-                                questions={quizData.questions}
-                                answers={answers}
-                                setAnswers={setAnswers}
-                                onSubmit={handleGrade}
-                                loading={loading}
-                            />
-                        )}
-
-                        {step === "results" && results && (
-                            <ResultsStep result={results} onClose={onClose} />
                         )}
 
                     </div>
@@ -218,80 +183,6 @@ function FormStep({ data, onChange, onSubmit, loading, onBack }: any) {
 
             <Button onClick={onSubmit} disabled={loading || !data.text} className="w-full h-12 bg-blue-600 hover:bg-blue-500 text-white font-medium">
                 {loading ? <span className="flex items-center gap-2"><Sparkles className="size-4 animate-spin" /> Generating Probe...</span> : "Generate Quiz"}
-            </Button>
-        </div>
-    )
-}
-
-function QuizStep({ questions, answers, setAnswers, onSubmit, loading }: any) {
-    return (
-        <div className="max-w-2xl mx-auto space-y-8 animate-in slide-in-from-right-10 duration-500">
-            <div className="space-y-2 text-center">
-                <h3 className="text-2xl font-semibold text-white">Diagnostic Quiz</h3>
-                <p className="text-zinc-400">Answer these to help us calibrate your learning path.</p>
-            </div>
-
-            <div className="space-y-6">
-                {questions.map((q: any, i: number) => (
-                    <div key={q.id} className="p-6 rounded-xl bg-zinc-900/40 border border-white/5 space-y-4">
-                        <h4 className="text-lg font-medium text-zinc-100"><span className="text-blue-500 mr-2">{i + 1}.</span>{q.question}</h4>
-                        <div className="grid gap-3">
-                            {q.options.map((opt: any) => (
-                                <button
-                                    key={opt.id}
-                                    onClick={() => setAnswers({ ...answers, [q.id]: opt.id })}
-                                    className={cn(
-                                        "text-left p-4 rounded-lg border transition-all text-sm",
-                                        answers[q.id] === opt.id
-                                            ? "bg-blue-500/10 border-blue-500 text-blue-200"
-                                            : "bg-zinc-900 border-white/5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                                    )}
-                                >
-                                    {opt.text}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <Button onClick={onSubmit} disabled={loading || Object.keys(answers).length !== questions.length} className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-lg mt-8">
-                {loading ? "Analyzing Results..." : "Submit & Grade"}
-            </Button>
-        </div>
-    )
-}
-
-function ResultsStep({ result, onClose }: any) {
-    return (
-        <div className="max-w-2xl mx-auto space-y-8 animate-in scale-95 duration-500">
-            <div className="text-center space-y-4">
-                <div className="inline-flex items-center justify-center p-4 rounded-full bg-emerald-500/10 mb-4">
-                    <span className="text-4xl font-bold text-emerald-400">{result.score}/{result.totalQuestions}</span>
-                </div>
-                <h3 className="text-3xl font-semibold text-white">Analysis Complete</h3>
-                <p className="text-zinc-300 leading-relaxed max-w-lg mx-auto">{result.feedback}</p>
-            </div>
-
-            <div className="space-y-4">
-                <h4 className="text-sm font-medium text-zinc-500 uppercase tracking-wider">Corrections</h4>
-                {result.corrections.map((c: any, i: number) => (
-                    <div key={i} className={cn("p-4 rounded-lg border flex gap-4", c.correct ? "bg-emerald-900/10 border-emerald-500/20" : "bg-red-900/10 border-red-500/20")}>
-                        <div className={cn("mt-1 size-6 rounded-full flex items-center justify-center shrink-0", c.correct ? "bg-emerald-500/20 text-emerald-500" : "bg-red-500/20 text-red-500")}>
-                            {c.correct ? <Check className="size-3.5" /> : <X className="size-3.5" />}
-                        </div>
-                        <div>
-                            <p className={cn("font-medium mb-1", c.correct ? "text-emerald-400" : "text-red-400")}>
-                                {c.correct ? "Correct" : "Incorrect"}
-                            </p>
-                            <p className="text-zinc-400 text-sm">{c.explanation}</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <Button onClick={onClose} className="w-full h-12 bg-white text-black hover:bg-zinc-200 font-medium">
-                Continue to Dashboard
             </Button>
         </div>
     )

@@ -41,3 +41,56 @@ export const GradingResultSchema = z.object({
         explanation: z.string(),
     })),
 });
+
+// --- Course Generation Schemas ---
+
+// 1. Domain Map (The High-Level Terrain) - Phase A
+export const TopicGroupSchema = z.object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().describe("1-2 line purpose of this group"),
+    order: z.number(),
+    whyImportant: z.string().describe("Why this group exists and why users should care"),
+});
+
+export const DomainMapSchema = z.object({
+    subject: z.string(),
+    groups: z.array(TopicGroupSchema),
+    welcomeMessage: z.string().describe("A short, engaging message setting the context for the domain map"),
+});
+
+// 2. Micro-Concept (The Atomic Unit) - Phase C
+export const MicroConceptSchema = z.object({
+    id: z.string(),
+    title: z.string(),
+    type: z.enum(["priming", "core", "application", "review"]), // Concept Seeding vs Deep Dive
+    content: z.object({
+        hook: z.string().describe("One concrete hook or analogy (for priming)"),
+        explanation: z.string().describe("Short explanation (micro-learning)"),
+        example: z.string().optional().describe("Concrete example or scenario"),
+        visualizationPrompt: z.string().optional().describe("Prompt for generating a diagram/visual"),
+    }),
+    recallQuestion: z.object({
+        question: z.string().describe("Active recall question (not just recognition)"),
+        answer: z.string().describe("Correct answer"),
+        hint: z.string().optional(),
+    }).optional(),
+});
+
+// 3. Course Structure (The Full Map)
+export const SubTopicSchema = z.object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string(),
+    parentGroupId: z.string(),
+    order: z.number(),
+    estimatedTime: z.string(),
+    microConcepts: z.array(MicroConceptSchema).describe("List of atomic concepts to teach this subtopic"),
+    dependencies: z.array(z.string()).describe("IDs of other subtopics that must be learned first"),
+});
+
+export const CourseStructureSchema = z.object({
+    domainMap: DomainMapSchema,
+    subTopics: z.array(SubTopicSchema),
+    recommendedPath: z.array(z.string()).describe("Ordered list of subtopic IDs for the optimal learning path"),
+});

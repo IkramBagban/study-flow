@@ -1,0 +1,409 @@
+{
+  "domainMap": {
+    "subject": "Node.js",
+    "groups": [
+      {
+        "id": "nodejs-runtime",
+        "title": "Node.js Runtime & Core Concepts",
+        "description": "Understand the V8 engine, event loop, and how Node.js enables JavaScript to run server-side.",
+        "order": 1,
+        "whyImportant": "This is the foundation. Knowing how Node.js works under the hood is crucial for writing efficient and scalable applications."
+      },
+      {
+        "id": "nodejs-modules",
+        "title": "Modules & Package Management (npm)",
+        "description": "Learn how to organize code using modules and leverage the npm ecosystem for reusable packages.",
+        "order": 2,
+        "whyImportant": "Node.js thrives on its module system. Mastering it allows you to build complex applications by composing smaller, manageable pieces and utilizing community-built solutions."
+      },
+      {
+        "id": "nodejs-asynchronous",
+        "title": "Asynchronous Programming",
+        "description": "Grasp asynchronous patterns like callbacks, Promises, and async/await to handle non-blocking operations.",
+        "order": 3,
+        "whyImportant": "Node.js is single-threaded, so understanding asynchronous programming is essential for preventing blocking operations and maintaining responsiveness."
+      },
+      {
+        "id": "nodejs-webservers",
+        "title": "Building Web Servers with Express.js",
+        "description": "Use Express.js to create robust web servers, handle routing, and manage middleware.",
+        "order": 4,
+        "whyImportant": "Express.js simplifies web server development, providing a structure for handling requests, responses, and routing in a clean and organized manner."
+      },
+      {
+        "id": "nodejs-databases",
+        "title": "Databases & Data Persistence",
+        "description": "Connect to databases (SQL or NoSQL) and perform CRUD operations to store and retrieve data.",
+        "order": 5,
+        "whyImportant": "Most applications need to store data. Learning how to interact with databases is crucial for building complete backend systems."
+      },
+      {
+        "id": "nodejs-apis",
+        "title": "Building RESTful APIs",
+        "description": "Design and implement RESTful APIs to expose your application's functionality to other clients.",
+        "order": 6,
+        "whyImportant": "APIs are the backbone of modern web applications. Understanding how to build them allows you to create services that can be consumed by various frontends and other applications."
+      },
+      {
+        "id": "nodejs-deployment",
+        "title": "Deployment & Production",
+        "description": "Learn how to deploy your Node.js application to a production environment and monitor its performance.",
+        "order": 7,
+        "whyImportant": "Getting your application live is the ultimate goal. Understanding deployment strategies and monitoring tools ensures your application is accessible and performs well in the real world."
+      }
+    ],
+    "welcomeMessage": "Welcome to the world of Node.js! This map will guide you through the essential concepts for building backend applications with JavaScript."
+  },
+  "courseStructure": {
+    "domainMap": {
+      "subject": "Node.js Backend Fundamentals",
+      "groups": [
+        {
+          "id": "nodejs-intro",
+          "title": "Introduction to Node.js",
+          "description": "Understand the core concepts of Node.js and its role in backend development.",
+          "order": 1,
+          "whyImportant": "Node.js allows you to use JavaScript on the server-side, enabling full-stack development with a single language. It's crucial for building scalable and efficient backend applications."
+        },
+        {
+          "id": "nodejs-runtime",
+          "title": "Node.js Runtime Environment",
+          "description": "Explore the Node.js runtime environment, including the event loop and non-blocking I/O.",
+          "order": 2,
+          "whyImportant": "Understanding the runtime environment is essential for writing performant and responsive Node.js applications. It allows you to leverage the asynchronous nature of Node.js effectively."
+        },
+        {
+          "id": "nodejs-modules",
+          "title": "Node.js Modules and NPM",
+          "description": "Learn about Node.js modules, how to use them, and how to manage dependencies with NPM.",
+          "order": 3,
+          "whyImportant": "Modules are the building blocks of Node.js applications. NPM provides a vast ecosystem of reusable code, making development faster and more efficient."
+        },
+        {
+          "id": "nodejs-web",
+          "title": "Building Web Servers with Node.js",
+          "description": "Learn how to create web servers and handle HTTP requests using Node.js.",
+          "order": 4,
+          "whyImportant": "Node.js excels at building web servers and APIs. This is a fundamental skill for any backend developer using Node.js."
+        },
+        {
+          "id": "nodejs-data",
+          "title": "Data Handling in Node.js",
+          "description": "Explore how to interact with databases and handle data in Node.js applications.",
+          "order": 5,
+          "whyImportant": "Most backend applications need to store and retrieve data. Understanding how to connect to databases and manipulate data is crucial for building complete applications."
+        }
+      ],
+      "welcomeMessage": "Welcome to the Node.js Backend Fundamentals course! This course will guide you through the essential concepts and skills needed to build robust and scalable backend applications using Node.js."
+    },
+    "subTopics": [
+      {
+        "id": "nodejs-what",
+        "title": "What is Node.js?",
+        "description": "An introduction to Node.js and its purpose.",
+        "parentGroupId": "nodejs-intro",
+        "order": 1,
+        "estimatedTime": "30 minutes",
+        "microConcepts": [
+          {
+            "id": "nodejs-what-priming",
+            "title": "JavaScript Everywhere",
+            "type": "priming",
+            "content": {
+              "hook": "Imagine running JavaScript not just in the browser, but also on your server! That's the power of Node.js.",
+              "explanation": "Node.js allows developers to use JavaScript for both frontend and backend development, creating a unified development experience.",
+              "visualizationPrompt": "A diagram showing JavaScript code running on both a browser (client-side) and a server (Node.js)."
+            },
+            "recallQuestion": {
+              "question": "What is the primary benefit of using Node.js for backend development?",
+              "answer": "Using JavaScript for both frontend and backend development.",
+              "hint": "Think about code reusability and developer familiarity."
+            }
+          },
+          {
+            "id": "nodejs-what-core",
+            "title": "Node.js Explained",
+            "type": "core",
+            "content": {
+              "hook": "Node.js is a JavaScript runtime built on Chrome's V8 JavaScript engine.",
+              "explanation": "Node.js uses an event-driven, non-blocking I/O model that makes it lightweight and efficient. It's well-suited for building scalable network applications.",
+              "example": "Think of a busy restaurant where the waiter (Node.js) takes orders (requests) and the kitchen (backend) prepares them. The waiter doesn't wait for each order to be completed before taking the next one.",
+              "visualizationPrompt": "A diagram illustrating the event loop and non-blocking I/O model in Node.js."
+            },
+            "recallQuestion": {
+              "question": "What is the core engine that Node.js is built upon?",
+              "answer": "Chrome's V8 JavaScript engine.",
+              "hint": "It's the same engine that powers Google Chrome."
+            }
+          },
+          {
+            "id": "nodejs-what-application",
+            "title": "Use Cases for Node.js",
+            "type": "application",
+            "content": {
+              "hook": "Node.js is used in a wide range of applications, from real-time chat applications to RESTful APIs.",
+              "explanation": "Common use cases include building APIs, streaming services, and single-page applications. Companies like Netflix, Uber, and LinkedIn use Node.js.",
+              "example": "Imagine building a real-time chat application. Node.js's non-blocking I/O makes it ideal for handling many concurrent connections.",
+              "visualizationPrompt": "A diagram showing various applications built with Node.js, such as a chat app, an API server, and a streaming service."
+            },
+            "recallQuestion": {
+              "question": "Name one common use case for Node.js.",
+              "answer": "Building APIs, real-time applications, or streaming services.",
+              "hint": "Think about applications that require handling many concurrent connections."
+            }
+          }
+        ],
+        "dependencies": []
+      },
+      {
+        "id": "nodejs-eventloop",
+        "title": "The Event Loop",
+        "description": "Understanding the event loop in Node.js.",
+        "parentGroupId": "nodejs-runtime",
+        "order": 1,
+        "estimatedTime": "45 minutes",
+        "microConcepts": [
+          {
+            "id": "nodejs-eventloop-priming",
+            "title": "The Heartbeat of Node.js",
+            "type": "priming",
+            "content": {
+              "hook": "The event loop is like a traffic controller, managing tasks and ensuring everything runs smoothly in Node.js.",
+              "explanation": "It's a single-threaded loop that monitors the call stack and the callback queue, executing callbacks when the call stack is empty.",
+              "visualizationPrompt": "A diagram showing the event loop, call stack, callback queue, and how they interact."
+            },
+            "recallQuestion": {
+              "question": "What is the main function of the event loop in Node.js?",
+              "answer": "To manage tasks and execute callbacks.",
+              "hint": "Think about how Node.js handles asynchronous operations."
+            }
+          },
+          {
+            "id": "nodejs-eventloop-core",
+            "title": "How the Event Loop Works",
+            "type": "core",
+            "content": {
+              "hook": "The event loop continuously checks if the call stack is empty.",
+              "explanation": "When the call stack is empty, the event loop takes the first event from the callback queue and pushes it onto the call stack for execution. This process repeats continuously.",
+              "example": "Imagine a queue of tasks waiting to be executed. The event loop picks the first task and executes it, then repeats the process.",
+              "visualizationPrompt": "A detailed diagram illustrating the steps of the event loop, including checking the call stack, moving events from the callback queue, and executing them."
+            },
+            "recallQuestion": {
+              "question": "What happens when the call stack is empty in the event loop?",
+              "answer": "The event loop takes the first event from the callback queue and pushes it onto the call stack.",
+              "hint": "Think about the flow of tasks in the event loop."
+            }
+          },
+          {
+            "id": "nodejs-eventloop-application",
+            "title": "Practical Example of the Event Loop",
+            "type": "application",
+            "content": {
+              "hook": "Consider a scenario where you're reading a file asynchronously.",
+              "explanation": "The file reading operation is offloaded to the operating system. Once the file is read, a callback is placed in the callback queue. The event loop then executes this callback when the call stack is empty.",
+              "example": "Using `fs.readFile` to read a file asynchronously. The callback function is executed after the file is read.",
+              "visualizationPrompt": "A code example using `fs.readFile` and a diagram showing how the event loop handles the asynchronous file reading operation."
+            },
+            "recallQuestion": {
+              "question": "How does the event loop handle asynchronous file reading?",
+              "answer": "It offloads the file reading operation and executes a callback when the file is read.",
+              "hint": "Think about the non-blocking nature of Node.js."
+            }
+          }
+        ],
+        "dependencies": [
+          "nodejs-what"
+        ]
+      },
+      {
+        "id": "nodejs-npm",
+        "title": "NPM: Node Package Manager",
+        "description": "Introduction to NPM and package management.",
+        "parentGroupId": "nodejs-modules",
+        "order": 1,
+        "estimatedTime": "30 minutes",
+        "microConcepts": [
+          {
+            "id": "nodejs-npm-priming",
+            "title": "The App Store for Node.js",
+            "type": "priming",
+            "content": {
+              "hook": "Think of NPM as an app store, but for Node.js modules. It allows you to easily install and manage reusable code packages.",
+              "explanation": "NPM is the default package manager for Node.js. It provides access to a vast registry of open-source packages.",
+              "visualizationPrompt": "A visual analogy of NPM as an app store, showing various packages available for installation."
+            },
+            "recallQuestion": {
+              "question": "What is the primary purpose of NPM?",
+              "answer": "To install and manage reusable code packages.",
+              "hint": "Think about code sharing and dependency management."
+            }
+          },
+          {
+            "id": "nodejs-npm-core",
+            "title": "Using NPM",
+            "type": "core",
+            "content": {
+              "hook": "To install a package, you use the `npm install` command.",
+              "explanation": "The `npm install` command downloads and installs the specified package and its dependencies into your project's `node_modules` directory. The `package.json` file tracks your project's dependencies.",
+              "example": "Running `npm install express` to install the Express.js web framework.",
+              "visualizationPrompt": "A diagram showing the `node_modules` directory and the `package.json` file, illustrating how NPM manages dependencies."
+            },
+            "recallQuestion": {
+              "question": "What command is used to install a package using NPM?",
+              "answer": "`npm install`",
+              "hint": "Think about the action of adding a package to your project."
+            }
+          },
+          {
+            "id": "nodejs-npm-application",
+            "title": "Managing Dependencies with package.json",
+            "type": "application",
+            "content": {
+              "hook": "The `package.json` file is the heart of your Node.js project.",
+              "explanation": "It contains metadata about your project, including its dependencies, scripts, and version. You can create a `package.json` file using the `npm init` command.",
+              "example": "Creating a `package.json` file using `npm init` and then adding dependencies using `npm install --save <package-name>`.",
+              "visualizationPrompt": "An example `package.json` file showing its structure and key fields, such as `name`, `version`, `dependencies`, and `scripts`."
+            },
+            "recallQuestion": {
+              "question": "What is the purpose of the `package.json` file?",
+              "answer": "To store metadata about your project, including its dependencies and scripts.",
+              "hint": "Think about project configuration and dependency management."
+            }
+          }
+        ],
+        "dependencies": [
+          "nodejs-what"
+        ]
+      },
+      {
+        "id": "nodejs-express",
+        "title": "Building Web Servers with Express.js",
+        "description": "Introduction to Express.js and building web servers.",
+        "parentGroupId": "nodejs-web",
+        "order": 1,
+        "estimatedTime": "60 minutes",
+        "microConcepts": [
+          {
+            "id": "nodejs-express-priming",
+            "title": "Express.js: The Web Framework for Node.js",
+            "type": "priming",
+            "content": {
+              "hook": "Express.js is like a toolbox for building web applications in Node.js. It simplifies common tasks like routing and middleware.",
+              "explanation": "Express.js is a fast, unopinionated, minimalist web framework for Node.js. It provides a set of features for building web applications and APIs.",
+              "visualizationPrompt": "A visual analogy of Express.js as a toolbox, showing various tools and components for building web applications."
+            },
+            "recallQuestion": {
+              "question": "What is Express.js?",
+              "answer": "A web framework for Node.js.",
+              "hint": "Think about simplifying web development tasks."
+            }
+          },
+          {
+            "id": "nodejs-express-core",
+            "title": "Creating a Simple Express.js Server",
+            "type": "core",
+            "content": {
+              "hook": "To create a simple Express.js server, you need to install the `express` package and write a few lines of code.",
+              "explanation": "The basic steps involve importing the `express` module, creating an Express application, defining routes, and starting the server.",
+              "example": "A code example showing how to create a basic Express.js server that listens on port 3000 and responds with 'Hello, World!'",
+              "visualizationPrompt": "A code snippet of a basic Express.js server with annotations explaining each line of code."
+            },
+            "recallQuestion": {
+              "question": "What are the basic steps to create an Express.js server?",
+              "answer": "Import the `express` module, create an Express application, define routes, and start the server.",
+              "hint": "Think about the essential components of a web server."
+            }
+          },
+          {
+            "id": "nodejs-express-application",
+            "title": "Handling Routes and Middleware",
+            "type": "application",
+            "content": {
+              "hook": "Routes define how your application responds to client requests.",
+              "explanation": "Middleware functions have access to the request object (req), the response object (res), and the next middleware function in the application’s request-response cycle.",
+              "example": "Creating routes for handling GET and POST requests, and using middleware to log incoming requests.",
+              "visualizationPrompt": "A diagram showing the request-response cycle in Express.js, including routes and middleware functions."
+            },
+            "recallQuestion": {
+              "question": "What is the role of routes and middleware in Express.js?",
+              "answer": "Routes define how the application responds to requests, and middleware functions handle requests and responses.",
+              "hint": "Think about the flow of data in a web application."
+            }
+          }
+        ],
+        "dependencies": [
+          "nodejs-npm",
+          "nodejs-what"
+        ]
+      },
+      {
+        "id": "nodejs-mongodb",
+        "title": "Connecting to MongoDB",
+        "description": "Connecting to a MongoDB database from Node.js.",
+        "parentGroupId": "nodejs-data",
+        "order": 1,
+        "estimatedTime": "60 minutes",
+        "microConcepts": [
+          {
+            "id": "nodejs-mongodb-priming",
+            "title": "MongoDB: A NoSQL Database",
+            "type": "priming",
+            "content": {
+              "hook": "MongoDB is a NoSQL database that stores data in flexible, JSON-like documents.",
+              "explanation": "Unlike traditional relational databases, MongoDB doesn't require a predefined schema, making it easier to adapt to changing data requirements.",
+              "visualizationPrompt": "A visual comparison between a relational database table and a MongoDB document."
+            },
+            "recallQuestion": {
+              "question": "What is MongoDB?",
+              "answer": "A NoSQL database.",
+              "hint": "Think about the type of data it stores and its schema flexibility."
+            }
+          },
+          {
+            "id": "nodejs-mongodb-core",
+            "title": "Connecting to MongoDB with Mongoose",
+            "type": "core",
+            "content": {
+              "hook": "Mongoose is an Object Data Modeling (ODM) library for MongoDB and Node.js.",
+              "explanation": "Mongoose provides a schema-based solution to model your application data. It includes built-in type casting, validation, query building, and more.",
+              "example": "Using Mongoose to define a schema for a user and connecting to a MongoDB database.",
+              "visualizationPrompt": "A code snippet showing how to define a Mongoose schema and connect to a MongoDB database."
+            },
+            "recallQuestion": {
+              "question": "What is Mongoose?",
+              "answer": "An Object Data Modeling (ODM) library for MongoDB and Node.js.",
+              "hint": "Think about how it helps you interact with MongoDB."
+            }
+          },
+          {
+            "id": "nodejs-mongodb-application",
+            "title": "Performing CRUD Operations",
+            "type": "application",
+            "content": {
+              "hook": "CRUD operations (Create, Read, Update, Delete) are fundamental for interacting with a database.",
+              "explanation": "Using Mongoose, you can easily perform CRUD operations on your MongoDB database. This includes creating new documents, reading existing documents, updating documents, and deleting documents.",
+              "example": "Code examples showing how to create, read, update, and delete documents in MongoDB using Mongoose.",
+              "visualizationPrompt": "Code snippets demonstrating CRUD operations using Mongoose, with annotations explaining each operation."
+            },
+            "recallQuestion": {
+              "question": "What are CRUD operations?",
+              "answer": "Create, Read, Update, and Delete.",
+              "hint": "Think about the basic actions you can perform on data."
+            }
+          }
+        ],
+        "dependencies": [
+          "nodejs-npm",
+          "nodejs-what"
+        ]
+      }
+    ],
+    "recommendedPath": [
+      "nodejs-what",
+      "nodejs-eventloop",
+      "nodejs-npm",
+      "nodejs-express",
+      "nodejs-mongodb"
+    ]
+  }
+}
