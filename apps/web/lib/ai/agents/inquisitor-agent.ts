@@ -2,6 +2,10 @@
 import { AgentBase } from "../core/agent-base";
 
 export class InquisitorAgent extends AgentBase {
+    constructor() {
+        super("inquisitor");
+    }
+
     async generateQuestion(context: {
         concept: string;
         instruction: string;

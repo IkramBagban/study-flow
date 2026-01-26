@@ -1,87 +1,185 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Sparkles } from "lucide-react";
+import { BrainCircuit, Terminal, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { BlockRenderer } from "@/components/block-renderer";
+
+type LogEvent = {
+    id: string;
+    message: string;
+    type: "info" | "success" | "error" | "block";
+    timestamp: number;
+};
 
 export function ChapterContentLoader({ chapterId }: { chapterId: string }) {
     const router = useRouter();
-    const [status, setStatus] = useState<"starting" | "generating" | "finishing">("starting");
-    const [error, setError] = useState<string | null>(null);
+    const [logs, setLogs] = useState<LogEvent[]>([]);
+    const [blocks, setBlocks] = useState<any[]>([]); // Store generated blocks
+    const [currentConcept, setCurrentConcept] = useState<string>("");
+    const [progress, setProgress] = useState(0);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const bottomRef = useRef<HTMLDivElement>(null);
+
+    const addLog = (message: string, type: LogEvent["type"] = "info") => {
+        setLogs(prev => [...prev, {
+            id: Math.random().toString(36),
+            message,
+            type,
+            timestamp: Date.now()
+        }].slice(-5));
+    };
+
+    // Auto-scroll to bottom as content generates
+    useEffect(() => {
+        if (bottomRef.current) {
+            bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [blocks]);
 
     useEffect(() => {
         let mounted = true;
+        const controller = new AbortController();
 
-        const generate = async () => {
+        const startStream = async () => {
             try {
-                // Wait a tiny bit to show the starting state
-                await new Promise(r => setTimeout(r, 800));
-                if (!mounted) return;
-                setStatus("generating");
+                addLog("Connecting to Neural Engine...", "info");
 
-                const res = await fetch("/api/ai/course/generate-chapter", {
+                const response = await fetch("/api/ai/course/generate-chapter-stream", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ chapterId }),
+                    signal: controller.signal
                 });
 
-                if (!res.ok) throw new Error("Generation failed");
+                if (!response.ok) throw new Error("Stream failed");
+                if (!response.body) throw new Error("No response body");
 
-                if (!mounted) return;
-                setStatus("finishing");
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
 
-                // Refresh to show the new content
-                router.refresh();
-            } catch (err) {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split("\n\n");
+
+                    for (const line of lines) {
+                        if (!line.startsWith("event: ")) continue;
+
+                        const eventMatch = line.match(/^event: (.+)$/m);
+                        const dataMatch = line.match(/^data: (.+)$/m);
+
+                        if (!eventMatch || !dataMatch) continue;
+
+                        const event = eventMatch[1];
+                        const data = JSON.parse(dataMatch[1]);
+
+                        if (!mounted) return;
+
+                        switch (event) {
+                            case "concept-start":
+                                setCurrentConcept(data.conceptTitle || "Unknown Concept");
+                                setProgress(Math.round(((data.index - 1) / data.total) * 100));
+                                addLog(`Analyzing: ${data.conceptTitle}`, "info");
+                                break;
+
+                            case "block-complete":
+                                // Add the actual block content to state
+                                setBlocks(prev => [...prev, data.block]);
+                                addLog(`Generated ${data.block.type}`, "block");
+                                break;
+
+                            case "concept-complete":
+                                addLog(`Completed ${data.conceptTitle}`, "success");
+                                break;
+
+                            case "complete":
+                                addLog("Finalizing...", "success");
+                                router.refresh();
+                                return;
+
+                            case "error":
+                                addLog(`Error: ${data.error}`, "error");
+                                break;
+                        }
+                    }
+                }
+
+            } catch (err: any) {
+                if (err.name === 'AbortError') return;
                 console.error(err);
-                if (mounted) setError("Failed to generate content. Please try refreshing.");
+                if (mounted) addLog("Connection lost. Retrying...", "error");
             }
         };
 
-        generate();
+        const timeout = setTimeout(startStream, 500);
 
-        return () => { mounted = false; };
+        return () => {
+            mounted = false;
+            controller.abort();
+            clearTimeout(timeout);
+        };
     }, [chapterId, router]);
 
-    if (error) {
-        return (
-            <div className="p-12 border border-dashed border-red-200 rounded-2xl flex flex-col items-center justify-center text-red-400 gap-2">
-                <p>{error}</p>
-                <button
-                    onClick={() => window.location.reload()}
-                    className="text-xs underline hover:text-red-300"
-                >
-                    Reload Page
-                </button>
-            </div>
-        );
-    }
-
     return (
-        <div className="flex flex-col items-center justify-center py-24 space-y-6 animate-in fade-in zoom-in duration-500">
-            <div className="relative">
-                <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
-                <div className="relative bg-card border border-border p-4 rounded-full shadow-2xl">
-                    <Loader2 className="size-8 text-primary animate-spin" />
+        <div className="max-w-4xl mx-auto py-12 space-y-8">
+
+            {/* Header / Status */}
+            <div className="text-center space-y-4 mb-12">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium animate-pulse">
+                    <BrainCircuit className="size-4" />
+                    <span>Real-time Generation</span>
+                </div>
+                <h1 className="text-3xl font-bold">
+                    {currentConcept ? `Teaching: ${currentConcept}` : "Preparing Lesson..."}
+                </h1>
+
+                {/* Progress Bar */}
+                <div className="w-full max-w-md mx-auto h-1.5 bg-secondary rounded-full overflow-hidden">
+                    <div
+                        className="h-full bg-primary transition-all duration-500 ease-out"
+                        style={{ width: `${progress}%` }}
+                    />
                 </div>
             </div>
 
-            <div className="text-center space-y-2 max-w-md mx-auto">
-                <h3 className="text-xl font-semibold bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
-                    {status === "starting" && "Analyzing Concepts..."}
-                    {status === "generating" && "Crafting Neuro-Adaptive Lesson..."}
-                    {status === "finishing" && "Finalizing Visuals..."}
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                    Our AI is generating personalized explanations and diagrams for this chapter.
-                </p>
+            {/* LIVE CONTENT RENDERER */}
+            <div className="space-y-8 min-h-[400px]">
+                {blocks.map((block, i) => (
+                    <BlockRenderer key={i} block={block} />
+                ))}
+
+                {/* Typing Indicator at bottom */}
+                <div ref={bottomRef} className="flex items-center gap-2 text-muted-foreground pt-4 opacity-50">
+                    <Sparkles className="size-4 animate-spin" />
+                    <span className="text-sm font-mono">AI is composing next block...</span>
+                </div>
             </div>
 
-            <div className="flex gap-2">
-                <span className="w-2 h-2 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.3s]" />
-                <span className="w-2 h-2 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.15s]" />
-                <span className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" />
+            {/* Minimized Logs */}
+            <div className="mt-12 pt-6 border-t border-border/50">
+                <div className="bg-black/80 rounded-lg p-3 font-mono text-xs text-muted-foreground w-full max-w-2xl mx-auto">
+                    <div className="flex items-center gap-2 mb-2 opacity-50">
+                        <Terminal className="size-3" />
+                        <span>System Activity</span>
+                    </div>
+                    {logs.map((log) => (
+                        <div key={log.id} className="truncate">
+                            <span className={cn(
+                                log.type === 'error' ? "text-red-400" :
+                                    log.type === 'success' ? "text-emerald-400" :
+                                        log.type === 'block' ? "text-blue-400" :
+                                            "text-gray-400"
+                            )}>
+                                {log.type === 'block' ? '▪ ' : '> '}
+                                {log.message}
+                            </span>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );

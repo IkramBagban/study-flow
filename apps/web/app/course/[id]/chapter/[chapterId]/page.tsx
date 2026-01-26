@@ -143,7 +143,7 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
                                             return (
                                                 <div key={idx} className="my-6">
                                                     <Visualizer
-                                                        type={block.tool === 'mermaid' ? 'mermaid' : 'none'}
+                                                        type={block.tool || 'none'}
                                                         code={block.code}
                                                         caption={block.caption}
                                                     />

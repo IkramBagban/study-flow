@@ -2,6 +2,10 @@
 import { AgentBase } from "../core/agent-base";
 
 export class ProfessorAgent extends AgentBase {
+    constructor() {
+        super("professor");
+    }
+
     async generateText(context: {
         concept: string;
         course: string;

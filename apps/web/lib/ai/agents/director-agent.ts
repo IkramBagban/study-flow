@@ -2,6 +2,9 @@
 import { AgentBase } from "../core/agent-base";
 
 export class DirectorAgent extends AgentBase {
+    constructor() {
+        super("director");
+    }
     async planContentBytes(context: {
         course: string;
         module: string;
@@ -9,34 +12,29 @@ export class DirectorAgent extends AgentBase {
         conceptType: string;
     }): Promise<any[]> {
         const prompt = `
-        You are the Director of an educational content engine.
+        Role: Educational Director.
+        Context: ${this.getPromptContext(context)}
+        Task: Create a content flow (JSON Array) to teach this concept.
         
-        Context:
-        ${this.getPromptContext(context)}
-        
-        Task:
-        Decide the best SEQUENCE (Flow) of content blocks to teach this concept effectively.
-        Maximize student engagement and retention.
-
         Rules:
-        - If "priming": Start with an Analogy or Hook.
-        - If "core": Start with a Definition, then a Visual, then an Example.
-        - If "application": Start with a Problem Scenario, then a Solution.
-        - ALWAYS end with a "recall_question".
+        - "priming": Analogy/Hook -> Visual -> Definition
+        - "core": Definition -> Visual -> Example
+        - "application": Problem -> Solution
+        - End with "recall_question".
         
-        Available Agents/Block Types:
-        - "text" (Variant: "hook", "definition", "analogy", "example", "history")
-        - "visual" (Tools: "mermaid" for processes, "recharts" for data/math)
-        - "recall_question" (Assessment)
-
-        Output Example:
-        [
-            { "role": "text", "variant": "hook", "instruction": "Explain via a water pipe analogy" },
-            { "role": "visual", "tool": "mermaid", "instruction": "Flowchart of pressure accumulation" },
-            { "role": "recall_question", "instruction": "Test understanding of pressure" }
-        ]
-
-        CRITICAL: Return ONLY valid JSON array.
+        Types: "text" (hook,definition,analogy,example), "visual" (mermaid,recharts,svg,d3), "recall_question".
+        
+        CRITICAL - Visual Tool Selection:
+        - Use "mermaid" for: processes, workflows, sequences, relationships, hierarchies
+        - Use "recharts" for: simple data trends, bar/line/pie charts, basic statistics
+        - Use "svg" for: shapes, patterns, anatomical diagrams, physics, custom illustrations
+          Examples: candlestick patterns, molecular structures, geometric shapes, trading signals
+        - Use "d3" for: complex interactive visualizations, network graphs, force-directed layouts, advanced data viz
+          Examples: stock market trends, complex relationships, interactive scatter plots, tree diagrams
+        
+        Example: [{"role":"text","variant":"hook","instruction":"..."},{"role":"visual","tool":"svg","instruction":"..."}]
+        
+        Output: JSON Array ONLY.
         `;
 
         try {

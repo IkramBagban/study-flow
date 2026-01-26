@@ -14,9 +14,9 @@ export async function POST(req: Request) {
             validated.sourceText
         );
 
-        // IMPORTANT: In a real app, you might want to hide 'correctOptionId' from the client
-        // or store it in a DB and only send it back during grading.
-        // For MVP, we send it but will trust the backend grader for the final score.
+        // for v2
+        // TODO: Hide 'correctOptionId' from the client
+        // TODO: Store it in a DB and only send it back during grading.
 
         return NextResponse.json(quiz);
     } catch (error) {

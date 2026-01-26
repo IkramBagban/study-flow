@@ -139,8 +139,9 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                 })
             })
             const data = await res.json()
-            if (data.keyConcepts) {
-                setConceptChecks(data.keyConcepts)
+            const concepts = data.domainMap?.keyConcepts || data.keyConcepts
+            if (concepts) {
+                setConceptChecks(concepts)
                 setStep("checkpoint")
             }
         } catch (e) {
