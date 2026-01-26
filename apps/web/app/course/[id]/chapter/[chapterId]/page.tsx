@@ -97,7 +97,7 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
 
             <div className="space-y-12">
                 {concepts.map((concept, i) => (
-                    <section key={concept.id} className="relative">
+                    <section key={concept.id} className="relative group">
                         <div className="absolute -left-12 top-0 hidden lg:flex flex-col items-center h-full">
                             <div className="size-8 rounded-full bg-secondary border border-border flex items-center justify-center text-sm font-bold text-muted-foreground z-10">
                                 {i + 1}
@@ -120,49 +120,67 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
                                 <h2 className="text-2xl font-semibold">{concept.title}</h2>
                             </div>
 
-                            {/* Content Card */}
-                            {concept.isReady && typeof concept.content === 'object' && concept.content ? (
-                                <div className="p-6 rounded-2xl bg-card border border-border shadow-sm space-y-6">
-                                    {/* Hook / Metaphor */}
-                                    {(concept.content as any).hook && (
-                                        <div className="p-4 rounded-xl bg-secondary/30 italic text-muted-foreground border-l-4 border-yellow-500/50">
-                                            "{(concept.content as any).hook}"
-                                        </div>
-                                    )}
+                            {/* Dynamic Block Renderer */}
+                            {concept.isReady && Array.isArray(concept.content) ? (
+                                <div className="p-6 rounded-2xl bg-card border border-border shadow-sm space-y-8">
+                                    {(concept.content as any[]).map((block, idx) => {
+                                        if (block.type === 'text') {
+                                            if (block.variant === 'hook') {
+                                                return (
+                                                    <div key={idx} className="p-4 rounded-xl bg-secondary/30 italic text-muted-foreground border-l-4 border-yellow-500/50">
+                                                        "{block.content}"
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <div key={idx} className="prose prose-invert max-w-none text-dark leading-relaxed">
+                                                    {block.content}
+                                                </div>
+                                            );
+                                        }
 
-                                    {/* Clear Explanation */}
-                                    <div className="prose prose-invert max-w-none text-zinc-300 leading-relaxed">
-                                        {(concept.content as any).explanation}
-                                    </div>
+                                        if (block.type === 'visual') {
+                                            return (
+                                                <div key={idx} className="my-6">
+                                                    <Visualizer
+                                                        type={block.tool === 'mermaid' ? 'mermaid' : 'none'}
+                                                        code={block.code}
+                                                        caption={block.caption}
+                                                    />
+                                                </div>
+                                            );
+                                        }
 
-                                    {/* Example */}
-                                    {(concept.content as any).example && (
-                                        <div className="mt-4 bg-zinc-950 rounded-lg p-4 font-mono text-sm text-blue-200 overflow-x-auto border border-white/5">
-                                            {(concept.content as any).example}
-                                        </div>
-                                    )}
-
-                                    {/* Visualization */}
-                                    {(concept.content as any).visual && (concept.content as any).visual.type !== 'none' && (
-                                        <Visualizer
-                                            type={(concept.content as any).visual.type}
-                                            code={(concept.content as any).visual.code}
-                                            caption={(concept.content as any).visual.caption}
-                                        />
-                                    )}
+                                        if (block.type === 'quiz') {
+                                            return (
+                                                <div key={idx} className="mt-8 pt-8 border-t border-border">
+                                                    <div className="bg-primary/5 border border-primary/20 rounded-xl p-6">
+                                                        <h4 className="font-bold text-lg mb-2 flex items-center gap-2">
+                                                            <CheckCircle className="size-5 text-primary" />
+                                                            Active Recall
+                                                        </h4>
+                                                        <p className="font-medium text-lg mb-4">{block.question}</p>
+                                                        <div className="relative group cursor-pointer">
+                                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-secondary p-4 rounded-lg border border-border mt-2 text-sm text-center font-mono text-muted-foreground">
+                                                                {block.answer}
+                                                            </div>
+                                                            <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-muted-foreground group-hover:opacity-0 transition-opacity">
+                                                                Hover to Reveal Answer
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })}
                                 </div>
                             ) : (
                                 <div className="p-8 rounded-2xl border border-dashed border-border flex flex-col items-center justify-center text-muted-foreground gap-3">
                                     <PlayCircle className="size-8 animate-pulse text-primary" />
-                                    <p>Generating neuro-adaptive content...</p>
+                                    <p>Director Agent is composing content blocks...</p>
                                 </div>
                             )}
-
-                            {/* Active Recall Check (if exists) */}
-                            {/* Assuming we might store recall question in another field or inside content, 
-                                but schema has it as separate or optional. 
-                                For now, simplified view. 
-                            */}
                         </div>
                     </section>
                 ))}
