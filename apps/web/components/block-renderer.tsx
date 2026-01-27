@@ -38,7 +38,7 @@ export function BlockRenderer({ block }: { block: any }) {
                             <li className={cn("text-foreground/90", className)} {...props} />
                         ),
                         blockquote: ({ className, ...props }) => {
-                            const isHook = block.variant === 'hook';
+                            const isHook = block.variant === 'hook' || block.variant === 'analogy';
                             return (
                                 <blockquote className={cn(
                                     "border-l-4 pl-4 py-3 my-6 italic rounded-r-lg shadow-sm transition-colors",

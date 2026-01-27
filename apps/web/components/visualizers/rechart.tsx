@@ -56,22 +56,32 @@ export function UniversalRecharts({ code }: UniversalRechartsProps) {
             if (typeof code === 'string') {
                 let cleaned = code.trim()
 
-                // Extract JSON if it's wrapped in markdown fences
-                if (cleaned.includes('```')) {
-                    const match = cleaned.match(/```(?:json|js|jsx)?\s*([\s\S]*?)\s*```/)
-                    if (match && match[1]) cleaned = match[1]
+                // 1. Extract content from markdown code fences if present
+                const fenceMatch = cleaned.match(/```(?:json|javascript|js)?\s*([\s\S]*?)\s*```/)
+                if (fenceMatch && fenceMatch[1]) {
+                    cleaned = fenceMatch[1].trim()
                 }
 
-                // If it still looks like it might contain code, try a more aggressive approach (extract first { ... })
-                if (cleaned.includes('{') && cleaned.includes('}')) {
-                    const start = cleaned.indexOf('{')
-                    const end = cleaned.lastIndexOf('}')
-                    if (start !== -1 && end !== -1) {
-                        cleaned = cleaned.substring(start, end + 1)
+                // 2. Extract the first { ... } or [ ... ] block to ignore surrounding text
+                const blockMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/)
+                if (blockMatch && blockMatch[0]) {
+                    cleaned = blockMatch[0].trim()
+                }
+
+                try {
+                    parsed = JSON.parse(cleaned)
+                } catch (parseError) {
+                    // 3. Fallback: Aggressive cleanup for unquoted keys or trailing commas
+                    // This is a common AI error where it returns JS objects instead of JSON
+                    try {
+                        const fixedJson = cleaned
+                            .replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3') // Quote keys
+                            .replace(/,\s*([}\]])/g, '$1') // Remove trailing commas
+                        parsed = JSON.parse(fixedJson)
+                    } catch (finalError) {
+                        throw parseError // Throw original error if fix fails
                     }
                 }
-
-                parsed = JSON.parse(cleaned)
             }
 
             setConfig(parsed)

@@ -17,10 +17,22 @@ export class AgentBase {
     protected async safeParseJSON<T>(prompt: string): Promise<T> {
         try {
             const result = await this.model.invoke(prompt);
-            const text = result.content.toString();
-            // Remove markdown code fences
-            const cleaned = text.replace(/```(?:json|javascript)?/g, "").replace(/```/g, "").trim();
-            return JSON.parse(cleaned);
+            let text = result.content.toString().trim();
+
+            // 1. Try to find the JSON block inside markdown fences if they exist
+            const fenceMatch = text.match(/```(?:json|javascript|js)?\s*([\s\S]*?)\s*```/);
+            let jsonCandidate = fenceMatch ? fenceMatch[1].trim() : text;
+
+            // 2. If parsing fails, try to extract the first { or [ block
+            try {
+                return JSON.parse(jsonCandidate) as T;
+            } catch (e) {
+                const blockMatch = jsonCandidate.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+                if (blockMatch && blockMatch[0]) {
+                    return JSON.parse(blockMatch[0]) as T;
+                }
+                throw e;
+            }
         } catch (error) {
             console.error(`[${this.agentName}] JSON Parse Error for prompt: ${prompt.substring(0, 50)}...`, error);
             throw error;
