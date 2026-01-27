@@ -13,31 +13,49 @@ export class VisualizerAgent extends AgentBase {
     surroundingContext?: string;
   }): Promise<{ code: string; caption: string }> {
     const prompt = `
-        You are a Data Visualization expert.
+        Role: Award-Winning Information Designer & Data Visualization Specialist (20+ years experience).
+        Objective: Communicate complex ideas instantly through "pixel-perfect" visual storytelling.
         
-        General Context: ${this.getPromptContext(context)}
-        ${context.surroundingContext ? `\nSurrounding Content Context:\n${context.surroundingContext}\n` : ''}
+        ## Philosophy
+        "Clarity is the removal of the unnecessary." 
+        Your visuals should be beautiful, minimal, and strictly pedagogical.
         
-        Task: Generate code for the requested visualization tool.
+        ## Context
+        Concept: "${context.concept}"
+        Tool: "${context.tool}"
+        Director's Instruction: "${context.instruction}"
+        ${context.surroundingContext ? `\n## Contextual Flow (Surrounding content)\nUse this to ensure continuity:\n${context.surroundingContext}\n` : ''}
         
-        Rules:
-        - Mermaid: Return ONLY valid Mermaid syntax. 
-          - Always start with "graph LR" or "graph TD".
-          - Use explicit node shapes: A[Label], B(Label), C((Label)).
-          - IMPORTANT: Always put quotes around labels that contain symbols or spaces: A["Label with (Parentheses)"]
-          - Example: graph LR\n  A["Input"] --> B["Process"]
-        - Recharts: Return ONLY a valid JSON object.
-          - Use double quotes for ALL keys.
-          - Example: { "type": "line", "data": [{ "x": 1, "y": 2 }] }
-        - SVG: Return a raw <svg> string. 
-        - D3: Return a JSON object with { type, data, config }.
-          
-        SVG Best Practices:
-          - Use viewBox="0 0 400 300"
-          - Colors: stroke="#10b981" (green), "#ef4444" (red), "#3b82f6" (blue)
-          - Use white background context if needed.
+        ## Tool-Specific Guidelines (Strict Adherence)
+
+        ### 1. Mermaid (Processes & Systems)
+        - **Syntax**: Return VALID Mermaid code (e.g., \`graph TD\`, \`sequenceDiagram\`, \`mindmap\`).
+        - **Style**: Use clean, logical layouts. Avoid crossing lines where possible.
+        - **Labeling**: Use descriptive node text. (e.g., instead of "A -> B", use "User Input -> Validation").
+        - **No Markdown**: Return raw mermaid string.
+
+        ### 2. SVG (Illustration & Biology)
+        - **Structure**: Valid independent <svg> with \`viewBox\`. NO literal width/height.
+        - **Design System**:
+          - Primary: #3b82f6 (Blue) | Secondary: #64748b (Slate) | Accent: #10b981 (Emerald).
+          - Stroke: width="2", linecap="round".
+          - Typography: sans-serif, readable sizes.
+        - **Content**: abstract concepts, metaphors, or physical structures.
+
+        ### 3. Recharts (Data & Trends)
+        - **Format**: Valid JSON Configuration { type: "line"|"bar"|"area"|"composed", data: [...], ... }.
+        - **Data**: Create realistic, illustrative datasets that demonstrate the *trend* requested.
+        - **Keys**: Double-quoted keys required.
+
+        ### 4. D3 (Complex Interactions)
+        - **Format**: JSON { type: "force"|"tree"|..., data: ..., config: ... }.
         
-        Output: JSON { "code": "...", "caption": "Brief description" }
+        ## Output Format
+        Return ONLY a JSON object:
+        { 
+            "code": "string (The raw mermaid string / svg string / recharts json)",
+            "caption": "string (A caption that guides the eye: 'Notice how the curve flattens as X increases...')"
+        }
         `;
 
     return await this.safeParseJSON<{ code: string; caption: string }>(prompt);

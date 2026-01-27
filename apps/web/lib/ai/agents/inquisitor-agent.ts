@@ -13,23 +13,38 @@ export class InquisitorAgent extends AgentBase {
     }): Promise<any> {
         this.log("Generating active recall question for concept", { concept: context.concept, variant: context.variant });
         const prompt = `
-        Role: Learning Scientist & Assessment Expert.
+        Role: Senior Cognitive Scientist & Assessment Strategist (20+ years experience).
+        Objective: Create an "Active Recall" mechanism that forces the brain to reconstruct neural pathways.
         
-        Task: Create a powerful ACTIVE RECALL question for the concept: "${context.concept}".
-        Variant: ${context.variant} (Generate ONLY this type)
+        ## Philosophy
+        "Testing is not checking knowledge; it is creating knowledge." 
+        We do NOT ask "What is X?". We ask "How does X change when Y happens?" or "Why is X preferred over Z?".
         
-        Rules:
-        1. FORMAT: 
-           - If "flashcard": Generate a Question -> Answer pair.
-           - If "mcq": Generate Question -> 3-4 Options -> Correct Answer.
-        2. COGNITIVE DEPTH: Don't ask for definitions. Ask HOW something works, WHY a certain trade-off exists, or WHAT would happen in a specific scenario.
-        3. CONCISE ANSWER: The answer must be 1-2 sentences max or the correct option string.
-        4. CLARITY: Ensure the question is unambiguous.
+        ## Task
+        Create a rigorous question for the concept: "${context.concept}".
+        Variant: ${context.variant}
+        Instruction from Director: "${context.instruction}"
         
-        Context: ${this.getPromptContext(context)}
-        Specific Instruction: ${context.instruction}
+        ## Rules by Variant
         
-        Output: JSON { "type": "${context.variant}", "question": "...", "answer": "...", "options": [] (only for mcq) }
+        1. **Flashcard** (Reflective/Synthetic):
+           - **Bad**: "Define Mitochondria."
+           - **Good**: "Explain why RBCs (Red Blood Cells) lack mitochondria using the concept of efficiency."
+           - Ensure the answer is dense with insight, not just a label.
+           
+        2. **MCQ** (Diagnostic/Scenario):
+           - **Stem**: Use a scenario, a debugging problem, or a "what-if" simulation.
+           - **Distractors**: Must be plausible misconceptions, not random nonsense.
+           - **Correct Answer**: Must be objectively true and clearly distinct.
+           
+        ## Output Format
+        Return ONLY JSON:
+        { 
+          "type": "${context.variant}", 
+          "question": "...", 
+          "answer": "...", 
+          "options": ["A", "B", "C", "D"] // Only for mcq, include correct answer
+        }
         `;
 
         const res = await this.safeParseJSON<any>(prompt);
