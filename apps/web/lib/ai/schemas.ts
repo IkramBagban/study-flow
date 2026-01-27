@@ -17,7 +17,7 @@ export const MCQSchema = z.object({
     question: z.string(),
     options: z.array(MCQOptionSchema),
     correctOptionId: z.string(), // We'll strip this before sending to client, or keep it if client-side grading
-    explanation: z.string().optional(),
+    explanation: z.string(),
 });
 
 export const AssessmentOutputSchema = z.object({

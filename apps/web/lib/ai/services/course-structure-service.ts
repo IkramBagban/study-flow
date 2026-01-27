@@ -161,6 +161,7 @@ export class CourseStructureService {
         Generate a diagnostic quiz (Multiple Choice) to verify knowledge.
         - Include 3-5 high-value questions.
         - Focus on misconceptions.
+        - CRITICAL: Provide a one-liner "explanation" for why the correct answer is right.
         ${sourceText ? "- Use the provided resource as the primary source of truth." : ""}
         
         Output Format (JSON ONLY):
@@ -182,6 +183,33 @@ export class CourseStructureService {
 
         // Note: Using any for now as schema might need adjustment, but conceptually mapping to AssessmentOutputSchema
         return await this.safeParseJSON<any>(prompt, AssessmentOutputSchema);
+    }
+
+    /**
+     * Phase B.2: Infer Knowledge Profile
+     */
+    static async inferKnowledgeProfile(topic: string, level: string, concepts: string[], quizResults: any[]) {
+        console.log(`[CourseStructure] 🧠 Inferring profile for "${topic}"`);
+
+        const prompt = `
+        You are a Cognitive Scientist.
+        Subject: ${topic}
+        Stated Level: ${level}
+        User says they know these concepts: ${concepts.join(', ')}
+        Quiz Performance: ${JSON.stringify(quizResults)}
+        
+        Task: Infer a model of the user's understanding. 
+        - Generate 3-4 specific observations about their current grasp.
+        - Be constructive and insightful.
+        - Use "we" as in "We've observed..."
+        
+        Output Format (JSON ONLY):
+        {
+          "judgments": ["...", "...", "..."]
+        }
+        `;
+
+        return await this.safeParseJSON<any>(prompt);
     }
 
     /**

@@ -21,7 +21,7 @@ export class AgentBase {
 
             // 1. Try to find the JSON block inside markdown fences if they exist
             const fenceMatch = text.match(/```(?:json|javascript|js)?\s*([\s\S]*?)\s*```/);
-            let jsonCandidate = fenceMatch ? fenceMatch[1].trim() : text;
+            const jsonCandidate = (fenceMatch && fenceMatch[1]) ? fenceMatch[1].trim() : text;
 
             // 2. If parsing fails, try to extract the first { or [ block
             try {

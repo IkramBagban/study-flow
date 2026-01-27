@@ -23,13 +23,14 @@ import {
     ChevronRight,
     Search
 } from "lucide-react"
+import { SourceButton } from "./source-button"
 
 type Step =
-    | "source"     // NEW: Resource selection
-    | "discovery"  // Topic & Level
-    | "checkpoint" // Concept extraction check
-    | "assessment" // Diagnostic Quiz
-    | "summary"    // Knowledge Profile Judgment
+    | "discovery"  // 1. Topic & Level (Ask first)
+    | "source"     // 2. Resource selection (Ask second)
+    | "checkpoint" // 3. Concept extraction check
+    | "assessment" // 4. Diagnostic Quiz
+    | "summary"    // 5. Knowledge Profile Judgment
 
 const SUGGESTIONS = [
     "Language Learning", "Music Theory", "Photography Basics",
@@ -47,8 +48,9 @@ const STORAGE_KEY = "studyflow_wizard_state";
 export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
     const router = useRouter()
     const [isOpen, setIsOpen] = React.useState(false)
-    const [step, setStep] = React.useState<Step>("source")
+    const [step, setStep] = React.useState<Step>("discovery")
     const [isLoading, setIsLoading] = React.useState(false)
+    const [showQuizResults, setShowQuizResults] = React.useState(false)
 
     // Form Data
     const [topic, setTopic] = React.useState("")
@@ -142,7 +144,12 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
             const concepts = data.domainMap?.keyConcepts || data.keyConcepts
             if (concepts) {
                 setConceptChecks(concepts)
-                setStep("checkpoint")
+                // BEGINNER SKIP LOGIC
+                if (selectedLevel === "new") {
+                    handleFinishAssessment([]) // Skip assessment for beginners
+                } else {
+                    setStep("checkpoint")
+                }
             }
         } catch (e) {
             console.error(e)
@@ -181,27 +188,46 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
         }
     }
 
-    const handleFinishAssessment = () => {
-        // Here we'd ideally hit an AI to generate the "Judgment" list.
-        // For v1, let's derive some basic judgments or use a mock list that feels real.
-        // In a real implementation, we'd have a specific API for "Inference/Judgment".
+    const handleFinishAssessment = async (quizResponsesOverride?: any[]) => {
+        setIsLoading(true)
+        try {
+            const results = quizResponsesOverride || diagnosticQuestions.map(q => {
+                const selectedIdx = quizResponses[q.id]
+                const isCorrect = typeof selectedIdx === 'number' && q.options[selectedIdx]?.id === q.correctOptionId
+                return {
+                    questionId: q.id,
+                    correct: isCorrect
+                }
+            });
 
-        const correctCount = diagnosticQuestions.filter(q => {
-            const selectedIdx = quizResponses[q.id];
-            if (selectedIdx === undefined) return false;
-            const selectedOption = q.options[selectedIdx];
-            return selectedOption?.id === q.correctOptionId;
-        }).length;
+            const selectedConcepts = Object.entries(checkpointResponses)
+                .filter(([_, k]) => k)
+                .map(([c]) => c);
 
-        const mockJudgments = [
-            `You have a ${correctCount > 2 ? 'strong' : 'developing'} grasp of the core principles mentioned.`,
-            `Based on your concept check, you seem comfortable with: ${Object.entries(checkpointResponses).filter(([_, k]) => k).map(([c]) => c).slice(0, 2).join(", ") || "the fundamentals"}.`,
-            `We've identified some potential gaps in "${topic}" that we'll focus on.`,
-            `Your profile suggests an active, application-focused learning style for this topic.`
-        ];
-
-        setJudgments(mockJudgments);
-        setStep("summary");
+            const res = await fetch("/api/ai/course/generate", {
+                method: "POST",
+                body: JSON.stringify({
+                    topic,
+                    level: selectedLevel,
+                    goal: "Generate profile",
+                    action: "infer",
+                    selectedConcepts,
+                    quizResults: results
+                })
+            })
+            const data = await res.json()
+            if (data.judgments) {
+                setJudgments(data.judgments)
+                setStep("summary")
+            }
+        } catch (e) {
+            console.error(e)
+            // Fallback
+            setJudgments([`We've analyzed your performance in ${topic} and are tailoring the course.`]);
+            setStep("summary");
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     const handleCreateCourse = async () => {
@@ -284,10 +310,10 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                         <div
                             className="bg-primary transition-all duration-500 ease-in-out h-full"
                             style={{
-                                width: step === "source" ? "15%" :
-                                    step === "discovery" ? "35%" :
-                                        step === "checkpoint" ? "55%" :
-                                            step === "assessment" ? "75%" : "100%"
+                                width: step === "discovery" ? "20%" :
+                                    step === "source" ? "40%" :
+                                        step === "checkpoint" ? "60%" :
+                                            step === "assessment" ? "80%" : "100%"
                             }}
                         />
                     </div>
@@ -394,8 +420,8 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                     {step === "checkpoint" && (
                         <div className="flex flex-col gap-8 animate-in slide-in-from-right-10 duration-500">
                             <div className="flex flex-col gap-2">
-                                <h2 className="text-2xl font-semibold tracking-tight">Scanning your terrain...</h2>
-                                <p className="text-muted-foreground text-sm">Tell us which of these "Key Concepts" you already grasp to prune the course path.</p>
+                                <h2 className="text-2xl font-semibold tracking-tight">Calibrating your path...</h2>
+                                <p className="text-muted-foreground text-sm">Tell us which of these "Key Concepts" you already grasp to calibrate the course complexity.</p>
                             </div>
 
                             <div className="grid grid-cols-1 gap-3">
@@ -438,33 +464,80 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                             <div className="flex flex-col gap-8">
                                 {diagnosticQuestions.map((q, qIndex) => (
                                     <div key={q.id} className="flex flex-col gap-4">
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-primary/60">Module {qIndex + 1}</span>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-primary/60">Module {qIndex + 1}</span>
+                                            {showQuizResults && (
+                                                <span className={cn(
+                                                    "text-[10px] font-bold uppercase px-2 py-0.5 rounded",
+                                                    (() => {
+                                                        const idx = quizResponses[q.id];
+                                                        return typeof idx === 'number' && q.options[idx]?.id === q.correctOptionId;
+                                                    })()
+                                                        ? "bg-emerald-500/10 text-emerald-500"
+                                                        : "bg-destructive/10 text-destructive"
+                                                )}>
+                                                    {(() => {
+                                                        const idx = quizResponses[q.id];
+                                                        return typeof idx === 'number' && q.options[idx]?.id === q.correctOptionId;
+                                                    })() ? "Correct" : "Incorrect"}
+                                                </span>
+                                            )}
+                                        </div>
                                         <h3 className="text-lg font-medium leading-snug">{q.question}</h3>
                                         <div className="grid gap-2">
                                             {q.options.map((opt: any, oIndex: number) => {
                                                 const isSelected = quizResponses[q.id] === oIndex
+                                                const isCorrect = opt.id === q.correctOptionId
                                                 return (
                                                     <button
                                                         key={opt.id}
+                                                        disabled={showQuizResults}
                                                         onClick={() => setQuizResponses(prev => ({ ...prev, [q.id]: oIndex }))}
                                                         className={cn(
-                                                            "flex items-center gap-3 p-4 rounded-xl border text-left transition-all",
-                                                            isSelected ? "border-primary bg-primary/[0.04] ring-1 ring-primary" : "border-border hover:bg-secondary/30"
+                                                            "flex items-center gap-3 p-4 rounded-xl border text-left transition-all relative overflow-hidden",
+                                                            isSelected ? "border-primary bg-primary/[0.04] ring-1 ring-primary" : "border-border hover:bg-secondary/30",
+                                                            showQuizResults && isCorrect && "border-emerald-500 bg-emerald-500/5 ring-emerald-500",
+                                                            showQuizResults && isSelected && !isCorrect && "border-destructive bg-destructive/5 ring-destructive"
                                                         )}
                                                     >
                                                         <div className={cn(
-                                                            "h-5 w-5 rounded-full border flex items-center justify-center",
-                                                            isSelected ? "border-primary bg-primary text-white" : "border-border"
+                                                            "h-5 w-5 rounded-full border flex items-center justify-center relative z-10",
+                                                            isSelected ? "border-primary bg-primary text-white" : "border-border",
+                                                            showQuizResults && isCorrect && "border-emerald-500 bg-emerald-500 text-white",
+                                                            showQuizResults && isSelected && !isCorrect && "border-destructive bg-destructive text-white"
                                                         )}>
-                                                            {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                                                            {(showQuizResults && isCorrect) ? <Check size={12} /> : (isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />)}
                                                         </div>
-                                                        <span className="text-sm">{opt.text}</span>
+                                                        <span className="text-sm z-10">{opt.text}</span>
                                                     </button>
                                                 )
                                             })}
                                         </div>
+                                        {showQuizResults && q.explanation && (
+                                            <div className="p-4 rounded-xl bg-secondary/20 border border-border/50 text-xs text-muted-foreground leading-relaxed animate-in fade-in slide-in-from-top-1">
+                                                <strong className="text-foreground block mb-1">Context:</strong>
+                                                {q.explanation}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
+
+                                {showQuizResults && (
+                                    <div className="mt-4 p-6 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-bold uppercase tracking-widest text-primary/60">Diagnostic Complete</p>
+                                            <h4 className="text-xl font-bold">
+                                                {diagnosticQuestions.filter(q => {
+                                                    const idx = quizResponses[q.id];
+                                                    return idx !== undefined && q.options[idx]?.id === q.correctOptionId;
+                                                }).length} / {diagnosticQuestions.length} Correct
+                                            </h4>
+                                        </div>
+                                        <Button onClick={() => handleFinishAssessment()} className="gap-2">
+                                            See profile summary <ArrowRight size={16} />
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -518,23 +591,29 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                         variant="ghost"
                         disabled={isLoading}
                         onClick={() => {
-                            if (step === "source") setIsOpen(false)
-                            else if (step === "discovery") setStep("source")
-                            else if (step === "checkpoint") setStep("discovery")
-                            else if (step === "assessment") setStep("checkpoint")
+                            if (step === "discovery") setIsOpen(false)
+                            else if (step === "source") setStep("discovery")
+                            else if (step === "checkpoint") setStep("source")
+                            else if (step === "assessment") {
+                                if (showQuizResults) setShowQuizResults(false)
+                                else setStep("checkpoint")
+                            }
                             else if (step === "summary") setStep("assessment")
                         }}
                     >
-                        {step === "source" ? "Cancel" : <><ChevronLeft size={16} className="mr-2" /> Back</>}
+                        {step === "discovery" ? "Cancel" : <><ChevronLeft size={16} className="mr-2" /> Back</>}
                     </Button>
 
                     <Button
-                        disabled={(step === "source" && !sourceText) || (step === "discovery" && (!topic || !selectedLevel)) || isLoading}
+                        disabled={(step === "discovery" && (!topic || !selectedLevel)) || (step === "source" && !sourceText) || isLoading}
                         onClick={() => {
-                            if (step === "source") setStep("discovery")
-                            else if (step === "discovery") handleGenerateDomain()
+                            if (step === "discovery") setStep("source")
+                            else if (step === "source") handleGenerateDomain()
                             else if (step === "checkpoint") handleGenerateAssessment()
-                            else if (step === "assessment") handleFinishAssessment()
+                            else if (step === "assessment") {
+                                if (showQuizResults) handleFinishAssessment()
+                                else setShowQuizResults(true)
+                            }
                             else if (step === "summary") handleCreateCourse()
                         }}
                         className="px-8 min-w-[140px] relative overflow-hidden group"
@@ -554,25 +633,5 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                 </div>
             </div>
         </div>
-    )
-}
-
-function SourceButton({ icon: Icon, label, iconColor = "text-white", onClick, disabled, active }: any) {
-    return (
-        <button
-            onClick={onClick}
-            disabled={disabled}
-            className={cn(
-                "flex flex-col items-center justify-center gap-3 p-4 rounded-2xl border transition-all group",
-                disabled ? "opacity-40 cursor-not-allowed border-border/40" :
-                    active ? "border-primary bg-primary/[0.04] ring-1 ring-primary/20 scale-[1.02]" :
-                        "cursor-pointer border-border hover:bg-secondary/20 hover:border-border/80"
-            )}
-        >
-            <div className={cn("p-2 rounded-xl transition-colors", disabled ? "text-muted-foreground" : iconColor)}>
-                <Icon size={22} />
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground group-hover:text-foreground">{label}</span>
-        </button>
     )
 }
