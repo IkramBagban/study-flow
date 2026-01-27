@@ -129,10 +129,6 @@ export function ChapterContentLoader({ chapterId }: { chapterId: string }) {
 
             {/* Header / Status */}
             <div className="text-center space-y-4 mb-12">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium animate-pulse">
-                    <BrainCircuit className="size-4" />
-                    <span>Real-time Generation</span>
-                </div>
                 <h1 className="text-3xl font-bold">
                     {currentConcept ? `Teaching: ${currentConcept}` : "Preparing Lesson..."}
                 </h1>
@@ -159,27 +155,37 @@ export function ChapterContentLoader({ chapterId }: { chapterId: string }) {
                 </div>
             </div>
 
-            {/* Minimized Logs */}
-            <div className="mt-12 pt-6 border-t border-border/50">
-                <div className="bg-black/80 rounded-lg p-3 font-mono text-xs text-muted-foreground w-full max-w-2xl mx-auto">
-                    <div className="flex items-center gap-2 mb-2 opacity-50">
-                        <Terminal className="size-3" />
-                        <span>System Activity</span>
-                    </div>
+            {/* System Activity Indicator */}
+            <div className="mt-16 pt-8 border-t border-border/40 flex flex-col items-center gap-4">
+                <div className="flex items-center gap-6">
                     {logs.map((log) => (
-                        <div key={log.id} className="truncate">
+                        <div
+                            key={log.id}
+                            className={cn(
+                                "flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.15em] transition-all duration-700 animate-in fade-in slide-in-from-bottom-1",
+                                log.type === 'error' ? "text-destructive" :
+                                    log.type === 'success' ? "text-emerald-500" :
+                                        log.type === 'block' ? "text-primary/70" :
+                                            "text-muted-foreground/40"
+                            )}
+                        >
                             <span className={cn(
-                                log.type === 'error' ? "text-red-400" :
-                                    log.type === 'success' ? "text-emerald-400" :
-                                        log.type === 'block' ? "text-blue-400" :
-                                            "text-gray-400"
-                            )}>
-                                {log.type === 'block' ? '▪ ' : '> '}
-                                {log.message}
-                            </span>
+                                "size-1 rounded-full",
+                                log.type === 'error' ? "bg-destructive animate-pulse" :
+                                    log.type === 'success' ? "bg-emerald-500" :
+                                        log.type === 'block' ? "bg-primary/40" :
+                                            "bg-muted-foreground/20"
+                            )} />
+                            {log.message}
                         </div>
-                    ))}
+                    )).slice(-3)}
                 </div>
+
+                {blocks.length === 0 && (
+                    <div className="text-[11px] text-muted-foreground/30 font-mono tracking-tight animate-pulse">
+                        Neural Synapse: Initializing Pathing...
+                    </div>
+                )}
             </div>
         </div>
     );

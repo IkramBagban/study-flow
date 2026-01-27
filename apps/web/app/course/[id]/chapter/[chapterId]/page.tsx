@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Visualizer } from "@/components/visualizers/visualizer";
 
 import { ChapterContentLoader } from "@/components/chapter-content-loader";
-// ... imports
+import { BlockRenderer } from "@/components/block-renderer";
 
 export default async function ChapterPage(props: { params: Promise<{ id: string; chapterId: string }> }) {
     console.log("[ChapterPage] Rendering...");
@@ -77,10 +77,6 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
                         <BookOpen className="size-4" />
                         {concepts.length} Key Concepts
                     </span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-sm font-medium">
-                        <BrainCircuit className="size-4" />
-                        Neuro-Adaptive
-                    </span>
                 </div>
 
                 {/* Priming / Phase 0: Context Setting */}
@@ -99,8 +95,8 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
                 {concepts.map((concept, i) => (
                     <section key={concept.id} className="relative group">
                         <div className="absolute -left-12 top-0 hidden lg:flex flex-col items-center h-full">
-                            <div className="size-8 rounded-full bg-secondary border border-border flex items-center justify-center text-sm font-bold text-muted-foreground z-10">
-                                {i + 1}
+                            <div className="size-8 rounded-full bg-secondary border border-border/50 flex items-center justify-center text-[11px] font-bold text-muted-foreground/40 z-10 transition-colors group-hover:text-primary/70 group-hover:border-primary/30">
+                                {String(i + 1).padStart(2, '0')}
                             </div>
                             {i !== concepts.length - 1 && (
                                 <div className="w-px h-full bg-border -my-2" />
@@ -109,71 +105,16 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
 
                         <div className="space-y-6">
                             <div className="flex items-center gap-3">
-                                <span className={cn(
-                                    "text-xs font-bold px-2 py-1 rounded uppercase tracking-wider",
-                                    concept.type === "priming" ? "bg-yellow-500/20 text-yellow-500" :
-                                        concept.type === "core" ? "bg-blue-500/20 text-blue-500" :
-                                            "bg-purple-500/20 text-purple-500"
-                                )}>
-                                    {concept.type}
-                                </span>
+
                                 <h2 className="text-2xl font-semibold">{concept.title}</h2>
                             </div>
 
                             {/* Dynamic Block Renderer */}
                             {concept.isReady && Array.isArray(concept.content) ? (
                                 <div className="p-6 rounded-2xl bg-card border border-border shadow-sm space-y-8">
-                                    {(concept.content as any[]).map((block, idx) => {
-                                        if (block.type === 'text') {
-                                            if (block.variant === 'hook') {
-                                                return (
-                                                    <div key={idx} className="p-4 rounded-xl bg-secondary/30 italic text-muted-foreground border-l-4 border-yellow-500/50">
-                                                        "{block.content}"
-                                                    </div>
-                                                );
-                                            }
-                                            return (
-                                                <div key={idx} className="prose prose-invert max-w-none text-dark leading-relaxed">
-                                                    {block.content}
-                                                </div>
-                                            );
-                                        }
-
-                                        if (block.type === 'visual') {
-                                            return (
-                                                <div key={idx} className="my-6">
-                                                    <Visualizer
-                                                        type={block.tool || 'none'}
-                                                        code={block.code}
-                                                        caption={block.caption}
-                                                    />
-                                                </div>
-                                            );
-                                        }
-
-                                        if (block.type === 'quiz') {
-                                            return (
-                                                <div key={idx} className="mt-8 pt-8 border-t border-border">
-                                                    <div className="bg-primary/5 border border-primary/20 rounded-xl p-6">
-                                                        <h4 className="font-bold text-lg mb-2 flex items-center gap-2">
-                                                            <CheckCircle className="size-5 text-primary" />
-                                                            Active Recall
-                                                        </h4>
-                                                        <p className="font-medium text-lg mb-4">{block.question}</p>
-                                                        <div className="relative group cursor-pointer">
-                                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-secondary p-4 rounded-lg border border-border mt-2 text-sm text-center font-mono text-muted-foreground">
-                                                                {block.answer}
-                                                            </div>
-                                                            <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-muted-foreground group-hover:opacity-0 transition-opacity">
-                                                                Hover to Reveal Answer
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        }
-                                        return null;
-                                    })}
+                                    {(concept.content as any[]).map((block, idx) => (
+                                        <BlockRenderer key={idx} block={block} />
+                                    ))}
                                 </div>
                             ) : (
                                 <div className="p-8 rounded-2xl border border-dashed border-border flex flex-col items-center justify-center text-muted-foreground gap-3">
