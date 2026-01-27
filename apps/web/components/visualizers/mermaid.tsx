@@ -35,10 +35,13 @@ export default function MermaidDiagram({ code }: { code: string }) {
                     sanitized = sanitized.replace(/^```[a-z]*\n/, '').replace(/\n```$/, '');
                 }
 
-                // Only add quotes if they aren't already there to avoid triple-quoting \"\"\"Label\"\"\"
-                sanitized = sanitized
-                    .replace(/([a-zA-Z0-9_-]+)\((?!"|')([^)]+)(?!"|')\)/g, '$1("$2")')
-                    .replace(/([a-zA-Z0-9_-]+)\[(?!"|')([^\]]+)(?!"|')\]/g, '$1["$2"]');
+                // Remove Potential HTML wrappers (The AI sometimes wraps it in <div>)
+                sanitized = sanitized.replace(/<div[^>]*>[\s\S]*?<\/div>/gi, (match) => {
+                    // Extract inner text from div
+                    return match.replace(/<[^>]+>/g, '').trim();
+                });
+
+                sanitized = sanitized.replace(/<[^>]+>/g, ''); // Remove any other partial HTML tags
 
                 const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`
                 const { svg } = await mermaid.render(id, sanitized)

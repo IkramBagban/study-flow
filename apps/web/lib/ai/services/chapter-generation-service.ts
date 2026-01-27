@@ -2,6 +2,7 @@ import { InquisitorAgent } from "../agents/inquisitor-agent";
 import { DirectorAgent } from "../agents/director-agent";
 import { ProfessorAgent } from "../agents/professor-agent";
 import { VisualizerAgent } from "../agents/visualizer-agent";
+import { ReviewerAgent } from "../agents/reviewer-agent";
 import { prisma } from "@study-flow/db";
 
 /**
@@ -13,6 +14,7 @@ export class ChapterGenerationService {
     private static professor = new ProfessorAgent();
     private static visualizer = new VisualizerAgent();
     private static inquisitor = new InquisitorAgent();
+    private static reviewer = new ReviewerAgent();
 
     /**
      * Generate content for a chapter (non-streaming)
@@ -44,7 +46,7 @@ export class ChapterGenerationService {
                     conceptType: concept.type
                 });
 
-                console.log(`[Director] 📋 Plan: ${plan.length} blocks (${plan.map(p => p.role).join(' > ')})`);
+                console.log(`[Director]  Plan: ${plan.length} blocks (${plan.map(p => p.role).join(' > ')})`);
 
                 // 2. Generate blocks
                 const blocks = await this.generateBlocks(concept, chapter, plan);
@@ -60,19 +62,19 @@ export class ChapterGenerationService {
 
                 const failedCount = plan.length - blocks.length;
                 if (failedCount > 0) {
-                    console.log(`[Director] ⚠️  PARTIALLY SAVED (${blocks.length}/${plan.length} succeeded)`);
+                    console.log(`[Director]  PARTIALLY SAVED (${blocks.length}/${plan.length} succeeded)`);
                 } else {
-                    console.log(`[Director] ✅ COMPLETED`);
+                    console.log(`[Director]  COMPLETED`);
                 }
 
                 await new Promise(r => setTimeout(r, 1000)); // Rate limit
 
             } catch (error) {
-                console.error(`[Director] ❌ Failed concept "${concept.title}":`, error);
+                console.error(`[Director]  Failed concept "${concept.title}":`, error);
             }
         }
 
-        console.log(`\n[ChapterGen] 🎉 Completed in ${(Date.now() - startTime) / 1000}s`);
+        console.log(`\n[ChapterGen]  Completed in ${(Date.now() - startTime) / 1000}s`);
         return [];
     }
 
@@ -121,13 +123,29 @@ export class ChapterGenerationService {
 
                 callbacks.onProgress(`Planned ${plan.length} blocks for "${concept.title}"`);
 
-                // 2. Generate blocks with streaming
-                const blocks = await this.generateBlocksStreaming(
-                    concept,
-                    chapter,
-                    plan,
-                    (blockIndex, block) => callbacks.onBlockComplete(concept.title, blockIndex, block)
-                );
+                // 2. Generate blocks with streaming (Sequential for validation)
+                let runningContext = "";
+                const blocks: any[] = [];
+
+                for (const [taskIndex, task] of plan.entries()) {
+                    try {
+                        const block = await this.generateSingleBlock(task, concept, chapter, runningContext);
+
+                        if (block) {
+                            blocks.push(block);
+                            callbacks.onBlockComplete(concept.title, taskIndex, block);
+
+                            // Accumulate context
+                            if (block.type === 'text') {
+                                runningContext += `\n\n[Section: ${task.variant}]\n${block.content}`;
+                            } else if (block.type === 'visual') {
+                                runningContext += `\n\n[Visual: ${block.caption}]`;
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`Error generating block ${taskIndex}:`, error);
+                    }
+                }
 
                 // 3. Save
                 await prisma.concept.update({
@@ -156,27 +174,41 @@ export class ChapterGenerationService {
     /**
      * Generate blocks for a concept (non-streaming)
      */
+    /**
+     * Generate blocks sequentially to allow context accumulation and cross-validation
+     */
     private static async generateBlocks(concept: any, chapter: any, plan: any[]) {
-        const blocksPromises = plan.map(async (task, taskIndex) => {
+        const blocks = [];
+        let runningContext = ""; // Accumulates text content for validation context
+
+        for (const [taskIndex, task] of plan.entries()) {
             console.log(`  > [Block ${taskIndex + 1}] ${task.role} (${task.variant || task.tool || 'quiz'})`);
 
             try {
-                return await this.generateSingleBlock(task, concept, chapter);
+                // Generate block with access to previous context
+                const block = await this.generateSingleBlock(task, concept, chapter, runningContext);
+
+                if (block && block.type !== 'error') {
+                    blocks.push(block);
+
+                    // Accumulate context for future validation
+                    if (block.type === 'text') {
+                        runningContext += `\n\n[Section: ${task.variant}]\n${block.content}`;
+                    } else if (block.type === 'visual') {
+                        runningContext += `\n\n[Visual: ${block.caption}]`;
+                    }
+                }
             } catch (error) {
                 console.error(`  ✗ [Block ${taskIndex + 1}] Failed:`, error instanceof Error ? error.message : error);
-                return { type: 'error', message: `Failed to generate ${task.role}` };
             }
-        });
+        }
 
-        const blocksResults = await Promise.allSettled(blocksPromises);
-        return blocksResults
-            .filter(result => result.status === 'fulfilled')
-            .map(result => (result as PromiseFulfilledResult<any>).value)
-            .filter(b => b !== null && b.type !== 'error');
+        return blocks;
     }
 
     /**
      * Generate blocks with streaming callbacks
+     * thie is for parrallal generation of blocks. (but curently i moved to sequential, so they have context of each other and write related content)
      */
     private static async generateBlocksStreaming(
         concept: any,
@@ -206,54 +238,86 @@ export class ChapterGenerationService {
     /**
      * Generate a single content block
      */
-    private static async generateSingleBlock(task: any, concept: any, chapter: any) {
-        switch (task.role) {
-            case 'text':
+    /**
+     * Generate a single content block with Validation Loop
+     */
+    private static async generateSingleBlock(task: any, concept: any, chapter: any, previousContext: string = "") {
+        let attempts = 0;
+        const MAX_RETRIES = 2; // 1 initial + 1 retry
+
+        while (attempts < MAX_RETRIES) {
+            attempts++;
+
+            // --- GENERATION PHASE ---
+            let blockData = null;
+
+            if (task.role === 'text') {
                 const textContent = await this.professor.generateText({
                     concept: concept.title,
                     course: chapter.module.course.subject,
                     variant: task.variant,
                     instruction: task.instruction
                 });
-                return {
-                    type: 'text',
-                    variant: task.variant,
-                    content: textContent
-                };
+                blockData = { type: 'text', variant: task.variant, content: textContent };
 
-            case 'visual':
+            } else if (task.role === 'visual') {
                 const visualData = await this.visualizer.generateVisual({
                     concept: concept.title,
                     tool: task.tool,
                     instruction: task.instruction
                 });
-                return {
-                    type: 'visual',
-                    tool: task.tool,
-                    code: visualData.code,
-                    caption: visualData.caption
-                };
+                blockData = { type: 'visual', tool: task.tool, code: visualData.code, caption: visualData.caption };
+                // Visuals handled by their own internal loop in regenerateVisualBlock, 
+                // but initial generation here is still single-pass. 
+                // We'll leave visual validation to the dedicated regenerate flow for now to save tokens,
+                // OR we could call reviewVisual here. Let's stick to text/quiz validation as requested.
 
-            case 'recall_question':
+            } else if (task.role === 'recall_question') {
                 const quizData = await this.inquisitor.generateQuestion({
                     concept: concept.title,
                     instruction: task.instruction,
                     variant: task.variant || 'flashcard'
                 });
-                return {
-                    type: 'quiz',
-                    variant: task.variant || 'flashcard',
-                    ...quizData
-                };
+                blockData = { type: 'quiz', variant: task.variant || 'flashcard', ...quizData };
+            }
 
-            default:
-                return null;
+            if (!blockData) return null;
+
+            // --- VALIDATION PHASE ---
+            // Only validate Text and Quiz
+            if (blockData.type === 'text' || blockData.type === 'quiz') {
+                console.log(`  [Validator] Checking ${blockData.type}...`);
+                const review = await this.reviewer.validateContent({
+                    type: blockData.type as 'text' | 'quiz',
+                    content: blockData.type === 'text' ? blockData.content : blockData,
+                    knowledgeContext: previousContext
+                });
+
+                if (review.isApproved) {
+                    // console.log(`   [Validator] Approved.`);
+                    return blockData;
+                } else {
+                    console.warn(`   [Validator] Rejected: ${review.feedback}`);
+                    // Add feedback to instruction for retry
+                    if (task.instruction) {
+                        task.instruction += ` IMPORTANT: Previous version rejected. Fix: ${review.feedback}`;
+                    } else {
+                        task.instruction = `Fix: ${review.feedback}`;
+                    }
+                    // Loop continues...
+                }
+            } else {
+                return blockData; // Visuals pass through (reviewed elsewhere/later)
+            }
         }
+
+        console.warn(`  [Validator] Max retries reached for ${task.role}.`);
+        return null; // Or return the last attempt? usually null indicates failure to the caller.
     }
     /**
      * Regenerate a single visual block
      */
-    static async regenerateVisualBlock(conceptId: string, blockIndex: number) {
+    static async regenerateVisualBlock(conceptId: string, blockIndex: number, userFeedback?: string) {
         const concept = await prisma.concept.findUnique({
             where: { id: conceptId },
             include: { chapter: { include: { module: { include: { course: true } } } } }
@@ -268,28 +332,77 @@ export class ChapterGenerationService {
 
         const chapter = concept.chapter;
 
-        // Extract surrounding context (1-2 blocks before and after)
-        const before = content.slice(Math.max(0, blockIndex - 2), blockIndex);
-        const after = content.slice(blockIndex + 1, Math.min(content.length, blockIndex + 3));
+        // Create full context string from the entire lesson content
+        const contextString = content.map((b, i) => {
+            const isTarget = i === blockIndex;
+            const prefix = isTarget ? ">>> TARGET VISUAL TO REGENERATE <<<" : `[${b.type}]`;
+            const contentStr = b.content || b.question || b.caption || '';
+            return `${prefix}\n${contentStr}`;
+        }).join('\n\n');
 
-        const contextString = `
-BEFORE THIS VISUAL:
-${before.map(b => `[${b.type}] ${b.content || b.question || ''}`).join('\n')}
+        // Initial Regeneration Attempt
+        console.log(`[VisualGen]  Attempting regeneration for concept "${concept.title}"...`);
 
-THIS VISUAL:
-[visual] ${block.tool} - ${block.caption || ''}
+        let instruction = "REGENERATE this visual. The previous version had issues. Create a definitive, perfect version now.";
 
-AFTER THIS VISUAL:
-${after.map(b => `[${b.type}] ${b.content || b.question || ''}`).join('\n')}
-        `.trim();
+        if (userFeedback) {
+            console.log(`[VisualGen] User Feedback received: "${userFeedback}"`);
+            console.log(`[VisualGen] Translating feedback via Reviewer...`);
+            const technicalInstruction = await this.reviewer.translateUserFeedback({
+                concept: concept.title,
+                userFeedback,
+                currentCode: typeof block.code === 'string' ? block.code : JSON.stringify(block.code)
+            });
+            console.log(`[VisualGen]  Technical Instruction: "${technicalInstruction}"`);
+            instruction = `USER FEEDBACK APPLIED: ${technicalInstruction}. fix the previous code based on this.`;
+        }
 
-        // Generate new visual with a slight emphasis on refinement
-        const visualData = await this.visualizer.generateVisual({
+        let visualData = await this.visualizer.generateVisual({
             concept: concept.title,
             tool: block.tool,
-            instruction: "Regenerate and improve this visual. Ensure maximum technical correctness, clear labels, and professional aesthetics. Fix any overlapping text or confusing layouts from previous versions.",
-            surroundingContext: contextString
+            instruction,
+            surroundingContext: contextString,
+            previousCode: typeof block.code === 'string' ? block.code : JSON.stringify(block.code)
         });
+
+        // Review Cycle (Loop with Max Retries)
+        let attempts = 0;
+        const MAX_ATTEMPTS = 3;
+
+        while (attempts < MAX_ATTEMPTS) {
+            attempts++;
+            console.log(`[VisualGen] Reviewing candidate visual (Attempt ${attempts}/${MAX_ATTEMPTS})...`);
+
+            const review = await this.reviewer.reviewVisual({
+                concept: concept.title,
+                tool: block.tool,
+                code: visualData.code,
+                instruction: instruction
+            });
+
+            if (review.isApproved) {
+                console.log(`[VisualGen]  Review Approved.`);
+                break;
+            }
+
+            console.log(`[VisualGen]  Review Rejected: ${review.feedback}`);
+
+            if (attempts >= MAX_ATTEMPTS) {
+                console.warn(`[VisualGen]  Max retries reached. Saving last attempt despite errors.`);
+                break;
+            }
+
+            console.log(`[VisualGen]  Applying Fixes...`);
+
+            // Fix Attempt
+            visualData = await this.visualizer.generateVisual({
+                concept: concept.title,
+                tool: block.tool,
+                instruction: `FIX CRITICAL ISSUES found by QA: ${review.feedback}. Previous code IS PROVIDED. Fix these specific errors.`,
+                surroundingContext: contextString,
+                previousCode: visualData.code // Pass the candidate that failed review
+            });
+        }
 
         content[blockIndex] = {
             ...block,

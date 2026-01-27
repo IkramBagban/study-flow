@@ -8,9 +8,13 @@ export async function POST(
     const { conceptId, blockIndex } = await props.params;
 
     try {
+        const body = await req.json().catch(() => ({}));
+        const { feedback } = body;
+
         const updatedBlock = await ChapterGenerationService.regenerateVisualBlock(
             conceptId,
-            parseInt(blockIndex)
+            parseInt(blockIndex),
+            feedback
         );
 
         return NextResponse.json({ success: true, block: updatedBlock });

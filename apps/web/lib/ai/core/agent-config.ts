@@ -8,7 +8,8 @@ export const AGENT_MODELS: Record<string, AIConfig> = {
     // Director Agent - Plans content structure
     director: {
         provider: "google",
-        model: "gemini-2.0-flash",
+        // model: "gemini-2.0-flash",
+        model: "gemini-2.5-pro",
     },
 
     // Professor Agent - Generates text content
@@ -31,6 +32,11 @@ export const AGENT_MODELS: Record<string, AIConfig> = {
     inquisitor: {
         provider: "google",
         model: "gemini-2.0-flash",
+    },
+
+    reviewer: {
+        provider: "google",
+        model: "gemini-2.5-pro",
     },
 };
 
