@@ -248,4 +248,58 @@ export class ChapterGenerationService {
                 return null;
         }
     }
+    /**
+     * Regenerate a single visual block
+     */
+    static async regenerateVisualBlock(conceptId: string, blockIndex: number) {
+        const concept = await prisma.concept.findUnique({
+            where: { id: conceptId },
+            include: { chapter: { include: { module: { include: { course: true } } } } }
+        });
+
+        if (!concept || !Array.isArray(concept.content)) throw new Error("Concept or content not found");
+
+        const content = [...concept.content] as any[];
+        const block = content[blockIndex];
+
+        if (!block || block.type !== 'visual') throw new Error("Block is not a visual");
+
+        const chapter = concept.chapter;
+
+        // Extract surrounding context (1-2 blocks before and after)
+        const before = content.slice(Math.max(0, blockIndex - 2), blockIndex);
+        const after = content.slice(blockIndex + 1, Math.min(content.length, blockIndex + 3));
+
+        const contextString = `
+BEFORE THIS VISUAL:
+${before.map(b => `[${b.type}] ${b.content || b.question || ''}`).join('\n')}
+
+THIS VISUAL:
+[visual] ${block.tool} - ${block.caption || ''}
+
+AFTER THIS VISUAL:
+${after.map(b => `[${b.type}] ${b.content || b.question || ''}`).join('\n')}
+        `.trim();
+
+        // Generate new visual with a slight emphasis on refinement
+        const visualData = await this.visualizer.generateVisual({
+            concept: concept.title,
+            tool: block.tool,
+            instruction: "Regenerate and improve this visual. Ensure maximum technical correctness, clear labels, and professional aesthetics. Fix any overlapping text or confusing layouts from previous versions.",
+            surroundingContext: contextString
+        });
+
+        content[blockIndex] = {
+            ...block,
+            code: visualData.code,
+            caption: visualData.caption
+        };
+
+        await prisma.concept.update({
+            where: { id: conceptId },
+            data: { content }
+        });
+
+        return content[blockIndex];
+    }
 }

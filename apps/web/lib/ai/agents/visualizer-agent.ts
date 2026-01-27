@@ -10,11 +10,13 @@ export class VisualizerAgent extends AgentBase {
     concept: string;
     tool: string;
     instruction: string;
+    surroundingContext?: string;
   }): Promise<{ code: string; caption: string }> {
     const prompt = `
         You are a Data Visualization expert.
         
-        Context: ${this.getPromptContext(context)}
+        General Context: ${this.getPromptContext(context)}
+        ${context.surroundingContext ? `\nSurrounding Content Context:\n${context.surroundingContext}\n` : ''}
         
         Task: Generate code for the requested visualization tool.
         

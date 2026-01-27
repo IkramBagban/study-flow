@@ -9,10 +9,17 @@ export class AgentBase {
     constructor(agentName: string) {
         this.agentName = agentName;
         const config = getAgentModel(agentName);
-        console.log("config:=>", config)
         this.model = AIModelFactory.createModel(config);
-        console.log(`[${agentName}] Using ${config.provider}/${config.model}`);
+        console.log(`[${agentName}] Initialized with ${config.provider}/${config.model}`);
     }
+
+    protected log(step: string, details?: any) {
+        console.log(`[${this.agentName.toUpperCase()}] > ${step}`);
+        if (details) {
+            console.log(JSON.stringify(details, null, 2));
+        }
+    }
+
 
     protected async safeParseJSON<T>(prompt: string): Promise<T> {
         try {

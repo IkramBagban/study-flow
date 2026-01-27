@@ -12,6 +12,7 @@ export class ProfessorAgent extends AgentBase {
         variant: string;
         instruction: string;
     }): Promise<string> {
+        this.log(`Generating ${context.variant} for concept`, { concept: context.concept });
         const prompt = `
         You are an expert tutor. Write a concise educational text block using RICH TEXT formatting.
         
@@ -37,6 +38,7 @@ export class ProfessorAgent extends AgentBase {
         `;
 
         const res = await this.safeParseJSON<{ content: string }>(prompt);
+        this.log("Generated content", { length: res.content.length });
         return res.content;
     }
 }

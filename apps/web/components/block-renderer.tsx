@@ -1,4 +1,5 @@
 import { Visualizer } from "@/components/visualizers/visualizer";
+import { VisualBlock } from "@/components/visual-block";
 import { CheckCircle, Info, Lightbulb, AlertTriangle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -8,7 +9,13 @@ import rehypeHighlight from "rehype-highlight";
 import MermaidDiagram from "@/components/visualizers/mermaid";
 import { cn } from "@/lib/utils";
 
-export function BlockRenderer({ block }: { block: any }) {
+interface BlockRendererProps {
+    block: any;
+    conceptId?: string;
+    blockIndex?: number;
+}
+
+export function BlockRenderer({ block, conceptId, blockIndex }: BlockRendererProps) {
     if (block.type === 'text') {
         return (
             <div className="prose prose-zinc dark:prose-invert max-w-none leading-relaxed animate-in fade-in slide-in-from-bottom-2">
@@ -98,13 +105,11 @@ export function BlockRenderer({ block }: { block: any }) {
 
     if (block.type === 'visual') {
         return (
-            <div className="my-6 animate-in fade-in zoom-in duration-500">
-                <Visualizer
-                    type={block.tool || 'none'}
-                    code={block.code}
-                    caption={block.caption}
-                />
-            </div>
+            <VisualBlock
+                block={block}
+                conceptId={conceptId}
+                blockIndex={blockIndex}
+            />
         );
     }
 

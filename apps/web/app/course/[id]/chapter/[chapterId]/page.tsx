@@ -8,6 +8,7 @@ import { Visualizer } from "@/components/visualizers/visualizer";
 
 import { ChapterContentLoader } from "@/components/chapter-content-loader";
 import { BlockRenderer } from "@/components/block-renderer";
+import { RegenerateButton } from "@/components/regenerate-button";
 
 export default async function ChapterPage(props: { params: Promise<{ id: string; chapterId: string }> }) {
     console.log("[ChapterPage] Rendering...");
@@ -46,7 +47,10 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
                         <ChevronRight className="size-4" />
                         <span className="text-foreground font-medium">{chapter.title}</span>
                     </div>
-                    <h1 className="text-4xl font-bold">{chapter.title}</h1>
+                    <div className="flex items-center justify-between gap-4">
+                        <h1 className="text-4xl font-bold">{chapter.title}</h1>
+                        <RegenerateButton chapterId={chapter.id} />
+                    </div>
                 </div>
 
                 <ChapterContentLoader chapterId={chapter.id} />
@@ -71,7 +75,10 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
                     <ChevronRight className="size-4" />
                     <span className="text-foreground font-medium">{chapter.title}</span>
                 </div>
-                <h1 className="text-4xl font-bold">{chapter.title}</h1>
+                <div className="flex items-center justify-between gap-4">
+                    <h1 className="text-4xl font-bold">{chapter.title}</h1>
+                    <RegenerateButton chapterId={chapter.id} />
+                </div>
                 <div className="flex items-center gap-4 mt-4">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-sm font-medium">
                         <BookOpen className="size-4" />
@@ -113,7 +120,12 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
                             {concept.isReady && Array.isArray(concept.content) ? (
                                 <div className="p-6 rounded-2xl bg-card border border-border shadow-sm space-y-8">
                                     {(concept.content as any[]).map((block, idx) => (
-                                        <BlockRenderer key={idx} block={block} />
+                                        <BlockRenderer
+                                            key={idx}
+                                            block={block}
+                                            conceptId={concept.id}
+                                            blockIndex={idx}
+                                        />
                                     ))}
                                 </div>
                             ) : (

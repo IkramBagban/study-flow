@@ -35,11 +35,10 @@ export default function MermaidDiagram({ code }: { code: string }) {
                     sanitized = sanitized.replace(/^```[a-z]*\n/, '').replace(/\n```$/, '');
                 }
 
-                // Mermaid doesn't like special chars in labels unless quoted correctly.
-                // We'll escape problematic characters in labels that aren't already quoted.
+                // Only add quotes if they aren't already there to avoid triple-quoting \"\"\"Label\"\"\"
                 sanitized = sanitized
-                    .replace(/([a-zA-Z0-9_-]+)\(([^)]+)\)/g, '$1("$2")')
-                    .replace(/([a-zA-Z0-9_-]+)\[([^\]]+)\]/g, '$1["$2"]');
+                    .replace(/([a-zA-Z0-9_-]+)\((?!"|')([^)]+)(?!"|')\)/g, '$1("$2")')
+                    .replace(/([a-zA-Z0-9_-]+)\[(?!"|')([^\]]+)(?!"|')\]/g, '$1["$2"]');
 
                 const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`
                 const { svg } = await mermaid.render(id, sanitized)

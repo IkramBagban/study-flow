@@ -1,6 +1,8 @@
 
 import { prisma } from "@study-flow/db";
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { RegenerateButton } from "@/components/regenerate-button";
 
 export default async function CoursePage(props: { params: Promise<{ id: string }> }) {
     const params = await props.params;
@@ -56,17 +58,24 @@ export default async function CoursePage(props: { params: Promise<{ id: string }
                             </div>
                             <div className="bg-secondary/20 p-6 grid md:grid-cols-2 gap-4">
                                 {module.chapters.map((chapter) => (
-                                    <div key={chapter.id} className="flex items-start gap-4 p-4 rounded-lg bg-background border border-border/50 hover:border-primary/50 transition-colors cursor-pointer">
-                                        <div className="mt-1 h-2 w-2 rounded-full bg-blue-500 shrink-0" />
-                                        <div className="space-y-1">
-                                            <div className="font-medium text-sm">{chapter.title}</div>
-                                            <div className="text-xs text-muted-foreground flex items-center gap-2">
-                                                <span>{chapter.estimatedTime}</span>
-                                                <span>•</span>
-                                                <span>{chapter.concepts.length} concepts</span>
+                                    <Link
+                                        key={chapter.id}
+                                        href={`/course/${course.id}/chapter/${chapter.id}`}
+                                        className="flex items-start justify-between gap-4 p-4 rounded-lg bg-background border border-border/50 hover:border-primary/50 transition-all group/chapter"
+                                    >
+                                        <div className="flex items-start gap-4">
+                                            <div className="mt-1 h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+                                            <div className="space-y-1">
+                                                <div className="font-medium text-sm transition-colors group-hover/chapter:text-primary">{chapter.title}</div>
+                                                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                                    <span>{chapter.estimatedTime}</span>
+                                                    <span>•</span>
+                                                    <span>{chapter.concepts.length} concepts</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                        <RegenerateButton chapterId={chapter.id} variant="icon" className="opacity-0 group-hover/chapter:opacity-100" />
+                                    </Link>
                                 ))}
                             </div>
                         </div>
