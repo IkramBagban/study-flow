@@ -1,5 +1,5 @@
 
-import { Visualizer } from "@/components/visualizer";
+import { Visualizer } from "@/components/visualizers/visualizer";
 import { CheckCircle } from "lucide-react";
 
 export function BlockRenderer({ block }: { block: any }) {

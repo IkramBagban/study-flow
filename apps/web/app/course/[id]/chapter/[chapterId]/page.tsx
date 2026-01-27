@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { CourseService } from "@/lib/ai/course-service";
 import { ChevronRight, PlayCircle, BookOpen, CheckCircle, BrainCircuit } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Visualizer } from "@/components/visualizer";
+import { Visualizer } from "@/components/visualizers/visualizer";
 
 import { ChapterContentLoader } from "@/components/chapter-content-loader";
 // ... imports
@@ -84,7 +84,7 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
                 </div>
 
                 {/* Priming / Phase 0: Context Setting */}
-                <div className="mt-8 p-6 rounded-xl bg-gradient-to-r from-secondary/50 to-transparent border border-border/50">
+                {/* <div className="mt-8 p-6 rounded-xl bg-gradient-to-r from-secondary/50 to-transparent border border-border/50">
                     <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">Phase 0: Map the Terrain</h3>
                     <p className="text-lg text-foreground/90 leading-relaxed">
                         Before diving deep, remember: this chapter connects
@@ -92,7 +92,7 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
                         <span className="font-medium text-primary"> {chapter.module.course.goal}</span>.
                         We will build up from simple mental models to complex application.
                     </p>
-                </div>
+                </div> */}
             </div>
 
             <div className="space-y-12">
