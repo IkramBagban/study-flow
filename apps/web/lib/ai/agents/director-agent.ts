@@ -22,7 +22,10 @@ export class DirectorAgent extends AgentBase {
         - "application": Problem -> Solution
         - End with "recall_question".
         
-        Types: "text" (hook,definition,analogy,example), "visual" (mermaid,recharts,svg,d3), "recall_question".
+        Types: 
+        - "text" (hook,definition,analogy,example)
+        - "visual" (mermaid,recharts,svg,d3)
+        - "recall_question" (flashcard,mcq)
         
         CRITICAL - Visual Tool Selection:
         - Use "mermaid" for: processes, workflows, sequences, relationships, hierarchies

@@ -237,10 +237,12 @@ export class ChapterGenerationService {
             case 'recall_question':
                 const quizData = await this.inquisitor.generateQuestion({
                     concept: concept.title,
-                    instruction: task.instruction
+                    instruction: task.instruction,
+                    variant: task.variant || 'flashcard'
                 });
                 return {
                     type: 'quiz',
+                    variant: task.variant || 'flashcard',
                     ...quizData
                 };
 
