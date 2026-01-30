@@ -44,11 +44,13 @@ export class ChapterGenerationService {
                     currentTaskIndex: 0,
                     blocks: [],
                     runningContext: "",
-                    errors: []
+                    errors: [],
+                    tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
                 }, { recursionLimit: 100 });
 
                 const blocks = result.blocks || [];
-                console.log(`[Graph] Completed with ${blocks.length} blocks.`);
+                const tokens = result.tokenUsage || { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+                console.log(`[Graph] Completed with ${blocks.length} blocks | Tokens: ${tokens.totalTokens} (in: ${tokens.inputTokens}, out: ${tokens.outputTokens})`);
 
                 // Save
                 await prisma.concept.update({
@@ -95,6 +97,9 @@ export class ChapterGenerationService {
 
         const conceptsToGenerate = chapter.concepts.filter(c => !c.isReady);
 
+        // Chapter-level token tracking
+        let chapterTokens = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+
         callbacks.onProgress(`Starting ${conceptsToGenerate.length} concepts`);
 
         if (conceptsToGenerate.length === 0) {
@@ -124,10 +129,12 @@ export class ChapterGenerationService {
                     currentDraft: null,
                     feedback: null,
                     retryCount: 0,
-                    errors: []
+                    errors: [],
+                    tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
                 }, { streamMode: "values", recursionLimit: 100 });
 
                 let finalBlocks: any[] = [];
+                let finalTokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
 
                 // Process Stream Updates (Values Mode)
                 for await (const chunk of stream) {
@@ -146,7 +153,19 @@ export class ChapterGenerationService {
                         }
                         finalBlocks = currentBlocks;
                     }
+
+                    // Track token usage from state
+                    if (currentState.tokenUsage) {
+                        finalTokenUsage = currentState.tokenUsage;
+                    }
                 }
+
+                console.log(`[Concept] "${concept.title}" complete: ${finalBlocks.length} blocks | Tokens: ${finalTokenUsage.totalTokens} (in: ${finalTokenUsage.inputTokens}, out: ${finalTokenUsage.outputTokens})`);
+
+                // Accumulate chapter-level tokens
+                chapterTokens.inputTokens += finalTokenUsage.inputTokens;
+                chapterTokens.outputTokens += finalTokenUsage.outputTokens;
+                chapterTokens.totalTokens += finalTokenUsage.totalTokens;
 
                 // Final Save - finalBlocks is already populated from the loop
                 await prisma.concept.update({
@@ -169,8 +188,10 @@ export class ChapterGenerationService {
             }
         }
 
-        callbacks.onProgress(`Completed in ${(Date.now() - startTime) / 1000}s`);
-        console.log(`[ChapterGen] ✅ Chapter "${chapter.title}" fully generated!`);
+        const duration = (Date.now() - startTime) / 1000;
+        callbacks.onProgress(`Completed in ${duration}s`);
+        console.log(`[ChapterGen] Chapter "${chapter.title}" complete!`);
+        console.log(`[ChapterGen] Total: ${conceptsToGenerate.length} concepts | ${chapterTokens.totalTokens} tokens (in: ${chapterTokens.inputTokens}, out: ${chapterTokens.outputTokens}) | ${duration}s`);
     }
     /**
      * Regenerate a single block logic (Inline modern implementation)

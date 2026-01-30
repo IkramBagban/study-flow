@@ -27,7 +27,7 @@ const QuizOutput = z.object({
     explanation: z.string()
 });
 
-// --- Prompt Templates (Defined outside to avoid recreating on every call) ---
+// --- Prompt Templates ---
 
 const TEXT_SYSTEM_PROMPT = `Role: World-Renowned Professor & Science Communicator (25+ years experience).
 Persona: You are like Richard Feynman meets Carl Sagan. You explain complex topics with crystal clarity, infectious enthusiasm, and deep rigor.
@@ -118,6 +118,39 @@ Context So Far:
    - **Stem**: Use a scenario, a debugging problem, or a "what-if" simulation.
    - **Distractors**: Must be plausible misconceptions.`;
 
+// Helper to extract token usage from response metadata
+function extractTokenUsage(response: any): { inputTokens: number; outputTokens: number; totalTokens: number } {
+    try {
+        // Gemini returns usage in response_metadata.usage or usage_metadata
+        const responseMetadata = response?.response_metadata || {};
+        const usageMetadata = response?.usage_metadata || responseMetadata?.usage_metadata || {};
+
+        // Try multiple possible structures
+        const inputTokens =
+            usageMetadata?.input_tokens ||
+            usageMetadata?.promptTokenCount ||
+            responseMetadata?.usage?.promptTokenCount ||
+            0;
+
+        const outputTokens =
+            usageMetadata?.output_tokens ||
+            usageMetadata?.candidatesTokenCount ||
+            responseMetadata?.usage?.candidatesTokenCount ||
+            0;
+
+        const totalTokens =
+            usageMetadata?.total_tokens ||
+            usageMetadata?.totalTokenCount ||
+            responseMetadata?.usage?.totalTokenCount ||
+            (inputTokens + outputTokens) ||
+            0;
+
+        return { inputTokens, outputTokens, totalTokens };
+    } catch {
+        return { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    }
+}
+
 // --- The Master Generator Node ---
 export const generatorNode = async (state: ChapterGenState) => {
     const { plan, currentTaskIndex, runningContext, conceptTitle } = state;
@@ -129,15 +162,21 @@ export const generatorNode = async (state: ChapterGenState) => {
     const task = plan[currentTaskIndex];
     if (!task) return {};
 
-    console.log(`[LANGGRAPH-V2] ⚡ Generator Node: Creating Block ${currentTaskIndex + 1}/${plan.length} [${task.role} | ${task.variant || task.tool}]`);
+    const blockType = task.role;
+    const blockVariant = task.variant || task.tool || 'default';
+
+    console.log(`[Generator] Creating Block ${currentTaskIndex + 1}/${plan.length} [${blockType} | ${blockVariant}]`);
 
     // Retry logic
     if (state.feedback && state.currentDraft) {
-        console.warn(`[LANGGRAPH-V2] ↩️ Generator Retry (${(state.retryCount || 0) + 1}): ${state.feedback}`);
+        console.warn(`[Generator] Retry (${(state.retryCount || 0) + 1}): ${state.feedback}`);
         task.instruction += `\n\n[CRITICAL FEEDBACK - FIX THIS]: ${state.feedback}`;
     }
 
     let generatedBlock: any = null;
+    let errorMessage: string | null = null;
+    let tokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    const startTime = Date.now();
 
     // 1. Text Generation
     if (task.role === 'text') {
@@ -147,18 +186,27 @@ export const generatorNode = async (state: ChapterGenState) => {
         ]);
 
         try {
-            const result = await prompt.pipe(professorModel.withStructuredOutput(TextOutput)).invoke({
+            const chain = prompt.pipe(professorModel.withStructuredOutput(TextOutput, { includeRaw: true }));
+            const response = await chain.invoke({
                 concept: conceptTitle,
                 context: runningContext || "Start of chapter.",
                 instruction: task.instruction
             });
-            generatedBlock = { type: 'text', variant: task.variant, content: result.content };
+
+            const duration = Date.now() - startTime;
+            tokenUsage = extractTokenUsage(response.raw);
+
+            console.log(`[Generator] Text block: ${duration}ms | ${tokenUsage.totalTokens} tokens (in: ${tokenUsage.inputTokens}, out: ${tokenUsage.outputTokens})`);
+
+            generatedBlock = { type: 'text', variant: task.variant, content: response.parsed.content };
         } catch (e) {
-            console.error(`[Generator] Text generation failed for ${conceptTitle}:`, e);
+            errorMessage = e instanceof Error ? e.message : 'Unknown error';
+            console.error(`[Generator] Text generation failed (${Date.now() - startTime}ms): ${errorMessage}`);
+
             generatedBlock = {
                 type: 'text',
                 variant: task.variant,
-                content: `(Content generation failed. Please regenerate.)\n\nError: ${e instanceof Error ? e.message : 'Unknown'}`
+                content: `(Content generation failed. Please regenerate.)\n\nError: ${errorMessage}`
             };
         }
     }
@@ -171,20 +219,29 @@ export const generatorNode = async (state: ChapterGenState) => {
         ]);
 
         try {
-            const result = await prompt.pipe(visualizerModel.withStructuredOutput(VisualOutput)).invoke({
+            const chain = prompt.pipe(visualizerModel.withStructuredOutput(VisualOutput, { includeRaw: true }));
+            const response = await chain.invoke({
                 concept: conceptTitle,
                 tool: task.tool || 'mermaid',
                 context: runningContext || "No context",
                 instruction: task.instruction
             });
-            generatedBlock = { type: 'visual', tool: task.tool, code: result.code, caption: result.caption };
+
+            const duration = Date.now() - startTime;
+            tokenUsage = extractTokenUsage(response.raw);
+
+            console.log(`[Generator] Visual block (${task.tool}): ${duration}ms | ${tokenUsage.totalTokens} tokens (in: ${tokenUsage.inputTokens}, out: ${tokenUsage.outputTokens})`);
+
+            generatedBlock = { type: 'visual', tool: task.tool, code: response.parsed.code, caption: response.parsed.caption };
         } catch (e) {
-            console.error(`[Generator] Visual generation failed for ${conceptTitle}:`, e);
+            errorMessage = e instanceof Error ? e.message : 'Unknown error';
+            console.error(`[Generator] Visual generation failed (${Date.now() - startTime}ms): ${errorMessage}`);
+
             generatedBlock = {
                 type: 'visual',
                 tool: task.tool,
                 code: 'graph TD; A["Error"] --> B["Could Not Generate Visual"];',
-                caption: `Generation failed: ${e instanceof Error ? e.message : 'Unknown'}`
+                caption: `Generation failed: ${errorMessage}`
             };
         }
     }
@@ -197,21 +254,30 @@ export const generatorNode = async (state: ChapterGenState) => {
         ]);
 
         try {
-            const result = await prompt.pipe(professorModel.withStructuredOutput(QuizOutput)).invoke({
+            const chain = prompt.pipe(professorModel.withStructuredOutput(QuizOutput, { includeRaw: true }));
+            const response = await chain.invoke({
                 concept: conceptTitle,
                 context: runningContext || "No context",
                 variant: task.variant || 'flashcard',
                 instruction: task.instruction
             });
-            generatedBlock = { type: 'quiz', variant: task.variant, ...result };
+
+            const duration = Date.now() - startTime;
+            tokenUsage = extractTokenUsage(response.raw);
+
+            console.log(`[Generator] Quiz block (${task.variant}): ${duration}ms | ${tokenUsage.totalTokens} tokens (in: ${tokenUsage.inputTokens}, out: ${tokenUsage.outputTokens})`);
+
+            generatedBlock = { type: 'quiz', variant: task.variant, ...response.parsed };
         } catch (e) {
-            console.error(`[Generator] Quiz generation failed for ${conceptTitle}:`, e);
+            errorMessage = e instanceof Error ? e.message : 'Unknown error';
+            console.error(`[Generator] Quiz generation failed (${Date.now() - startTime}ms): ${errorMessage}`);
+
             generatedBlock = {
                 type: 'quiz',
                 variant: task.variant,
                 question: 'Generation Error',
                 answer: 'Please regenerate.',
-                explanation: `Error: ${e instanceof Error ? e.message : 'Unknown'}`
+                explanation: `Error: ${errorMessage}`
             };
         }
     }
@@ -220,8 +286,17 @@ export const generatorNode = async (state: ChapterGenState) => {
     const isRetry = !!state.feedback;
     const nextRetryCount = (state.retryCount || 0) + (isRetry ? 1 : 0);
 
-    return {
+    // Build state update with error and token accumulation
+    const stateUpdate: any = {
         currentDraft: generatedBlock,
-        retryCount: nextRetryCount
+        retryCount: nextRetryCount,
+        tokenUsage: tokenUsage
     };
+
+    // Accumulate errors to state if any occurred
+    if (errorMessage) {
+        stateUpdate.errors = [`[${blockType}/${blockVariant}] ${errorMessage}`];
+    }
+
+    return stateUpdate;
 };

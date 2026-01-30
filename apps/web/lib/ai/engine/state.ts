@@ -66,6 +66,15 @@ export const ChapterGenAnnotation = Annotation.Root({
     errors: Annotation<string[]>({
         reducer: (x, y) => x.concat(y),
     }),
+
+    // Token Usage Tracking (Observability)
+    tokenUsage: Annotation<{ inputTokens: number; outputTokens: number; totalTokens: number }>({
+        reducer: (x, y) => ({
+            inputTokens: (x?.inputTokens || 0) + (y?.inputTokens || 0),
+            outputTokens: (x?.outputTokens || 0) + (y?.outputTokens || 0),
+            totalTokens: (x?.totalTokens || 0) + (y?.totalTokens || 0),
+        }),
+    }),
 });
 
 export type ChapterGenState = typeof ChapterGenAnnotation.State;
