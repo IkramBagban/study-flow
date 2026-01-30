@@ -10,19 +10,20 @@ export type AIProvider = "google" | "openai" | "anthropic";
 export interface AIConfig {
     provider: AIProvider;
     model?: string;
+    temperature?: number;
 }
 
 // Factory to create model instances
 export class AIModelFactory {
     static createModel(config: AIConfig): BaseChatModel {
-        console.log(`[AIModelFactory] Initializing ${config.provider} model: ${config.model}`);
+        // console.log(`[AIModelFactory] Initializing ${config.provider} model: ${config.model}`);
 
         switch (config.provider) {
             case "google":
                 return new ChatGoogleGenerativeAI({
                     model: config.model || "gemini-2.0-flash",
-                    apiKey: process.env.GOOGLE_API_KEY!,
-                    temperature: 0.1,
+                    apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY,
+                    temperature: config.temperature ?? 0.7,
                     maxRetries: 3,
                 });
 
@@ -30,14 +31,14 @@ export class AIModelFactory {
                 return new ChatOpenAI({
                     modelName: config.model || "gpt-4o",
                     apiKey: process.env.OPENAI_API_KEY!,
-                    temperature: 0.1,
+                    temperature: config.temperature ?? 0.7,
                 });
 
             case "anthropic":
                 return new ChatAnthropic({
                     modelName: config.model || "claude-3-5-sonnet-20241022",
                     anthropicApiKey: process.env.ANTHROPIC_API_KEY!,
-                    temperature: 0.1,
+                    temperature: config.temperature ?? 0.7,
                 });
 
             default:

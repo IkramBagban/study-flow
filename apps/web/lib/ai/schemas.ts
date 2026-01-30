@@ -67,22 +67,29 @@ export const SimpleMicroConceptSchema = z.object({
 });
 
 // 3. Course Structure (The Full Map)
-export const SubTopicSchema = z.object({
-    id: z.string(),
+// 3. Course Structure (The Full Map) - Phase B
+export const ConceptSchema = z.object({
     title: z.string(),
-    parentGroupId: z.string(),
+    description: z.string(),
+    type: z.enum(["priming", "core", "application"]),
+    order: z.number()
+});
+
+export const ChapterSchema = z.object({
+    title: z.string(),
+    description: z.string(),
     order: z.number(),
-    estimatedTime: z.string(),
-    microConcepts: z.array(SimpleMicroConceptSchema).describe("List of atomic concepts to teach this subtopic"),
+    concepts: z.array(ConceptSchema)
+});
+
+export const ModuleSchema = z.object({
+    title: z.string(),
+    description: z.string(),
+    order: z.number(),
+    chapters: z.array(ChapterSchema)
 });
 
 export const CourseStructureSchema = z.object({
-    domainMap: z.object({
-        subject: z.string(),
-        welcomeMessage: z.string(),
-        groups: z.array(TopicGroupSchema),
-    }),
-    subTopics: z.array(SubTopicSchema),
-    recommendedPath: z.array(z.string()).describe("Ordered list of subtopic IDs for the optimal learning path"),
+    modules: z.array(ModuleSchema)
 });
 

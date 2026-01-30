@@ -17,8 +17,17 @@ export async function POST(req: NextRequest) {
 
                 // Helper to send SSE events
                 const sendEvent = (event: string, data: any) => {
-                    const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-                    controller.enqueue(encoder.encode(message));
+                    try {
+                        const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+                        controller.enqueue(encoder.encode(message));
+                    } catch (e: any) {
+                        // If the controller is already closed (client disconnect/abort), just ignore.
+                        if (e.code === 'ERR_INVALID_STATE' || e.message?.includes('closed')) {
+                            // console.warn('[SSE] Stream closed by client, stopping write.');
+                            return;
+                        }
+                        console.error('[SSE] Write error:', e);
+                    }
                 };
 
                 // Create callbacks for the CourseService

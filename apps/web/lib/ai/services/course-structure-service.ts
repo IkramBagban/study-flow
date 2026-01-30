@@ -12,204 +12,114 @@ const model = AIModelFactory.createModel(currentAIConfig);
 export class CourseStructureService {
 
     /**
-     * Helper to safely parse JSON from AI with validation
-     */
-    private static async safeParseJSON<T>(prompt: string, schema?: z.ZodSchema<T>): Promise<T> {
-        const start = Date.now();
-        console.log(`[CourseStructure] 🟡 Generating JSON...`);
-
-        try {
-            const result = await model.invoke(prompt);
-            const text = result.content.toString();
-            const cleaned = text.replace(/```(?:json|javascript)?/g, "").replace(/```/g, "").trim();
-            const parsed = JSON.parse(cleaned);
-
-            if (schema) {
-                const validated = schema.safeParse(parsed);
-                if (!validated.success) {
-                    console.error("[CourseStructure] ❌ Validation Failed:", validated.error.format());
-                    throw new Error(`Invalid structure: ${validated.error.message}`);
-                }
-                console.log(`[CourseStructure] ✅ Validated (${Date.now() - start}ms)`);
-                return validated.data;
-            }
-
-            console.log(`[CourseStructure] ✅ Parsed (${Date.now() - start}ms)`);
-            return parsed;
-        } catch (error) {
-            console.error("[CourseStructure] ❌ Parse Error:", prompt.substring(0, 100) + "...");
-            throw error;
-        }
-    }
-
-    /**
-     * Phase A: Generate Domain Map
+     * Phase A: Generate Domain Map (Delegates to Architect Analyzer Node)
      */
     static async generateDomainMap(topic: string, goal: string, sourceText?: string) {
         console.log(`[CourseStructure] 🚀 Generating Domain Map for "${topic}"`);
+        const { analyzerNode } = await import("../engine/architect/nodes/analyzer");
 
-        const prompt = `
-        You are an expert curriculum designer.
-        User wants to learn: "${topic}"
-        Goal: "${goal}"
-        ${sourceText ? `Primary Resource: ${sourceText.substring(0, 4000)}` : ''}
-        
-        Task:
-        1. Create a "Domain Map" for this subject
-        2. Break into 4-7 core "Topic Groups"
-        3. For each group, explain why it matters
-        4. List 5-10 "Key Concepts" users should know
-        ${sourceText ? "IMPORTANT: Prioritize concepts from the resource." : ""}
+        // Construct minimal state for the node
+        const state: any = { topic, goal, sourceText };
+        const result = await analyzerNode(state);
 
-        Output Format (JSON ONLY):
-        {
-          "domainMap": {
-             "subject": "...",
-             "welcomeMessage": "...",
-             "keyConcepts": ["..."],
-             "groups": [
-                { "id": "...", "title": "...", "description": "...", "order": 1, "whyImportant": "..." }
-             ]
-          }
-        }
-        `;
-
-        return await this.safeParseJSON<any>(prompt);
+        if (result.error) throw new Error(result.error);
+        return result.domainMap; // Node returns { domainMap: ... }
     }
 
     /**
-     * Phase B: Generate Course Structure (Modules & Chapters)
+     * Phase B: Generate Course Structure (Delegates to Architect Structurer Node)
      */
     static async generateCourseStructure(domainMap: any, userLevel: string) {
         console.log(`[CourseStructure] 📚 Generating course structure (Level: ${userLevel})`);
+        const { structurerNode } = await import("../engine/architect/nodes/structurer");
 
-        const prompt = `
-        Domain Map: ${JSON.stringify(domainMap.domainMap)}
-        User Level: ${userLevel}
-        
-        Task: Create a course structure with modules and chapters.
-        
-        Rules:
-        - 3-5 modules
-        - 3-4 chapters per module
-        - Use "Neuroscience Sequencing": priming → core → application
-        - Each concept needs 1-2 sentences explaining its purpose
-        
-        Output Format (JSON ONLY):
-        {
-          "modules": [
-            {
-              "title": "...",
-              "description": "...",
-              "order": 1,
-              "chapters": [
-                {
-                  "title": "...",
-                  "description": "...",
-                  "order": 1,
-                  "concepts": [
-                    { "title": "...", "description": "...", "type": "priming|core|application", "order": 1 }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-        `;
+        const state: any = {
+            topic: domainMap.subject || "Unknown Topic",
+            level: userLevel,
+            domainMap: domainMap
+        };
 
-        // We use a custom schema here because the legacy CourseStructureSchema uses a flat 'subTopics' list
-        // but we want a nested structure for the database.
-        const ConceptSchema = z.object({
-            title: z.string(),
-            description: z.string(),
-            type: z.enum(["priming", "core", "application"]),
-            order: z.number()
-        });
+        const result = await structurerNode(state);
 
-        const ChapterSchema = z.object({
-            title: z.string(),
-            description: z.string(),
-            order: z.number(),
-            concepts: z.array(ConceptSchema)
-        });
-
-        const ModuleSchema = z.object({
-            title: z.string(),
-            description: z.string(),
-            order: z.number(),
-            chapters: z.array(ChapterSchema)
-        });
-
-        const ResultSchema = z.object({
-            modules: z.array(ModuleSchema)
-        });
-
-        return await this.safeParseJSON<any>(prompt, ResultSchema);
+        if (result.error) throw new Error(result.error);
+        return result.structure;
     }
 
     /**
-     * Phase B: Generate Diagnostic Quiz
+     * Phase B: Generate Diagnostic Quiz (Level 2 Implementation)
      */
     static async generateDiagnosticQuiz(topic: string, goal: string, level: string, concepts: string[], sourceText?: string) {
         console.log(`[CourseStructure] 📝 Generating diagnostic quiz for "${topic}"`);
+        const { ChatPromptTemplate } = await import("@langchain/core/prompts");
+        const { AssessmentOutputSchema } = await import("../schemas");
 
-        const prompt = `
-        You are an expert tutor. Create a diagnostic quiz for "${topic}".
-        Level: ${level}. Known concepts: ${concepts.join(', ')}.
-        
-        Task:
-        Generate a diagnostic quiz (Multiple Choice) to verify knowledge.
-        - Include 3-5 high-value questions.
-        - Focus on misconceptions.
-        - CRITICAL: Provide a one-liner "explanation" for why the correct answer is right.
-        ${sourceText ? "- Use the provided resource as the primary source of truth." : ""}
-        
-        Output Format (JSON ONLY):
-        {
-          "questions": [
-            {
-              "id": "q1",
-              "question": "...",
-              "options": [
-                { "id": "a", "text": "..." },
-                { "id": "b", "text": "..." }
-              ],
-              "correctOptionId": "a",
-              "explanation": "..."
-            }
-          ]
-        }
-        `;
+        const model = AIModelFactory.createModel(currentAIConfig); // Use default factory config
 
-        // Note: Using any for now as schema might need adjustment, but conceptually mapping to AssessmentOutputSchema
-        return await this.safeParseJSON<any>(prompt, AssessmentOutputSchema);
+        const prompt = ChatPromptTemplate.fromMessages([
+            ["system", `You are an expert tutor. Create a diagnostic quiz (Multiple Choice) to assess the user's knowledge.
+             Subject: {topic}
+             Level: {level}
+             Known Concepts: {concepts}
+             Goal: {goal}
+             ${sourceText ? "Source Material: {sourceText}" : ""}
+             
+             Requirements:
+             - 3-5 high-value questions testing conceptual understanding.
+             - Focus on misconceptions.
+             - Provide an 'explanation' for the correct answer.
+             
+             CRITICAL: Return ONLY the raw JSON data matching the schema. Do NOT generate a React component or UI code. Just the data.
+            `],
+            ["user", "Generate the quiz questions data."]
+        ]);
+
+        const chain = prompt.pipe(model.withStructuredOutput(AssessmentOutputSchema));
+
+        return await chain.invoke({
+            topic,
+            level,
+            goal,
+            concepts: concepts.join(", "),
+            sourceText: sourceText ? sourceText.substring(0, 4000) : ""
+        });
     }
 
     /**
-     * Phase B.2: Infer Knowledge Profile
+     * Phase B.2: Infer Knowledge Profile (Level 2 Implementation)
      */
     static async inferKnowledgeProfile(topic: string, level: string, concepts: string[], quizResults: any[]) {
         console.log(`[CourseStructure] 🧠 Inferring profile for "${topic}"`);
+        const { ChatPromptTemplate } = await import("@langchain/core/prompts");
+        const { z } = await import("zod");
 
-        const prompt = `
-        You are a Cognitive Scientist.
-        Subject: ${topic}
-        Stated Level: ${level}
-        User says they know these concepts: ${concepts.join(', ')}
-        Quiz Performance: ${JSON.stringify(quizResults)}
-        
-        Task: Infer a model of the user's understanding. 
-        - Generate 3-4 specific observations about their current grasp.
-        - Be constructive and insightful.
-        - Use "we" as in "We've observed..."
-        
-        Output Format (JSON ONLY):
-        {
-          "judgments": ["...", "...", "..."]
-        }
-        `;
+        const model = AIModelFactory.createModel(currentAIConfig);
+        const ProfileSchema = z.object({
+            judgments: z.array(z.string())
+        });
 
-        return await this.safeParseJSON<any>(prompt);
+        const prompt = ChatPromptTemplate.fromMessages([
+            ["system", `You are a Cognitive Scientist. Infer a knowledge profile.
+             Subject: {topic}
+             Level: {level}
+             Self-Reported Concepts: {concepts}
+             Quiz Performance: {quizResults}
+             
+             Task:
+             - Generate 3-4 specific observations (judgments).
+             - Be constructive.
+             - Use "We've observed..." phrasing.
+            `],
+            ["user", "Infer the knowledge profile."]
+        ]);
+
+        const chain = prompt.pipe(model.withStructuredOutput(ProfileSchema));
+
+        return await chain.invoke({
+            topic,
+            level,
+            concepts: concepts.join(", "),
+            quizResults: JSON.stringify(quizResults)
+        });
     }
 
     /**
@@ -236,6 +146,9 @@ export class CourseStructureService {
     /**
      * Create course in database with full structure
      */
+    /**
+     * Create course in database with full structure (LangGraph Architecture)
+     */
     static async createCourse(input: {
         userId: string;
         topic: string;
@@ -244,13 +157,28 @@ export class CourseStructureService {
         sourceText?: string;
         assessmentData?: any;
     }) {
-        console.log(`[CourseStructure] 🎓 Creating course: "${input.topic}"`);
+        console.log(`[CourseArchitect] 🎓 Creating course: "${input.topic}"`);
 
-        // Phase A: Generate domain map
-        const domainMapData = await this.generateDomainMap(input.topic, input.goal, input.sourceText);
+        // Dynamic import to avoid circular dep issues during init
+        const { courseArchitectGraph } = await import("../engine/architect/graph");
 
-        // Phase B: Generate structure
-        const structure = await this.generateCourseStructure(domainMapData, input.level);
+        // Invoke the Graph
+        const result = await courseArchitectGraph.invoke({
+            topic: input.topic,
+            goal: input.goal,
+            level: input.level,
+            sourceText: input.sourceText,
+            domainMap: null,
+            structure: null,
+            error: null
+        });
+
+        if (result.error || !result.domainMap || !result.structure) {
+            throw new Error(result.error || "Failed to generate course structure");
+        }
+
+        const domainMap = result.domainMap;
+        const structure = result.structure;
 
         // Save to database
         const course = await prisma.course.create({
@@ -263,8 +191,8 @@ export class CourseStructureService {
                 level: input.level,
                 assessmentData: input.assessmentData ?? undefined,
                 sourceData: {
-                    domainMap: domainMapData.domainMap,
-                    keyConcepts: domainMapData.domainMap.keyConcepts,
+                    domainMap: domainMap,
+                    keyConcepts: domainMap.keyConcepts,
                     sourceText: input.sourceText
                 },
                 modules: {
@@ -295,7 +223,7 @@ export class CourseStructureService {
             include: { modules: { include: { chapters: { include: { concepts: true } } } } }
         });
 
-        console.log(`[CourseStructure] ✅ Course Created: ${course.id}`);
+        console.log(`[CourseArchitect] ✅ Course Created: ${course.id}`);
         return course;
     }
 }
