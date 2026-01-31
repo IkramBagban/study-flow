@@ -27,6 +27,7 @@ export const PlanItemSchema = z.object({
     role: z.enum(["text", "visual", "recall_question"]),
     variant: z.string().optional(),
     tool: z.string().optional(),
+    intent: z.string().optional().describe("For visuals: The pedagogical goal (e.g., 'compare-concept-a-and-b', 'show-process-flow')"),
     instruction: z.string(),
     status: z.enum(["pending", "generated", "approved", "rejected"]).default("pending"),
     feedback: z.string().optional(), // If rejected

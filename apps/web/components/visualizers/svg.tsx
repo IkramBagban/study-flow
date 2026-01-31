@@ -21,12 +21,15 @@ export function SVGDiagram({ code }: { code: string }) {
         )
     }
 
+    // Check for "sketchy" intent
+    const isSketchy = cleanCode.includes('class="sketchy"') || cleanCode.includes("sketchy: true");
+
     return (
         <div
-            className="w-full flex justify-center items-center bg-slate-50/50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+            className="w-full flex justify-center items-center bg-background/50 rounded-xl border border-border shadow-inner overflow-hidden min-h-[300px]"
         >
             <div
-                className="w-full [&>svg]:w-full [&>svg]:h-auto [&>svg]:max-h-[600px] p-4"
+                className={`w-full [&>svg]:w-full [&>svg]:h-auto [&>svg]:max-h-[600px] p-6 md:p-10 ${isSketchy ? 'sketchy' : ''}`}
                 dangerouslySetInnerHTML={{ __html: cleanCode }}
             />
         </div>

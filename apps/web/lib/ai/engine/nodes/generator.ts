@@ -35,7 +35,102 @@ const QuizOutput = z.object({
     explanation: z.string().describe("Brief explanation of why this answer is correct and what the student should learn.")
 }).describe("Quiz or recall question to test understanding");
 
-// --- Adaptive Prompt Templates (No hardcoded domain logic) ---
+// --- Visual Tools (Defined as Zod Schemas for LLM Tool Binding) ---
+
+const MermaidTool = z.object({
+    code: z.string().describe("Valid Mermaid syntax. Use graph TD. ALWAYS quote labels with special characters or math: A[\"V = πr²h\"]."),
+    caption: z.string().describe("Brief explanation of the diagram")
+}).describe("Generate a graph, flowchart, or architecture diagram using Mermaid.");
+
+const MafsTool = z.object({
+    code: z.string().describe("JSON Object with structure: { type: 'plot', items: [ { type: 'function', expression: 'x^2', color: 'blue' }, { type: 'point', x: 2, y: 4 } ], domain: { x: [-5, 5], y: [-5, 5] } }. Valid item types: function, point, line, text, vector, circle. Formulas must be strings."),
+    caption: z.string().describe("Math/Physics explanation")
+}).describe("Generate interactive math plots and physics coordinate systems.");
+
+const RechartsTool = z.object({
+    code: z.string().describe("JSON configuration for a chart. Include 'type' (line, bar, pie, area) and 'data' array."),
+    caption: z.string().describe("Data analysis caption")
+}).describe("Generate data visualizations (charts, bars, trends).");
+
+const ChemistryTool = z.object({
+    code: z.string().describe("Valid SMILES string for a molecule or reaction (e.g., 'C1=CC=CC=C1' for Benzene)."),
+    caption: z.string().describe("Chemical explanation")
+}).describe("Generate molecular structures and chemical reactions using SMILES notation.");
+
+const TimelineTool = z.object({
+    code: z.string().describe("JSON array of events: [{\"date\": \"...\", \"event\": \"...\", \"impact\": \"...\"}]"),
+    caption: z.string().describe("Historical context")
+}).describe("Generate a chronological timeline of events.");
+
+const SVGTool = z.object({
+    code: z.string().describe("Valid SVG markup. Include viewBox. Use primary #3b82f6, accent #10b981."),
+    caption: z.string().describe("Diagram caption")
+}).describe("Generate a custom scientific or technical SVG diagram.");
+
+const visualTools = {
+    mermaid: MermaidTool,
+    mafs: MafsTool,
+    recharts: RechartsTool,
+    chemistry: ChemistryTool,
+    timeline: TimelineTool,
+    svg: SVGTool
+};
+
+const VisualSelector = z.object({
+    tool: z.enum(["mermaid", "mafs", "recharts", "nivo", "chemistry", "timeline", "svg"]).describe("The technical tool selected to best fulfill the pedagogical intent"),
+    code: z.string().describe("The technical code for the selected tool"),
+    caption: z.string().describe("Contextual caption explaining the visual")
+}).describe("Selection and generation of the optimal visualization tool for a specific pedagogical intent");
+
+// --- Visual Tool Definitions (Agent Pattern) ---
+
+const VisualTools = {
+    mermaid: {
+        description: "Generate a graph, flowchart, or architecture diagram. Best for processes, state machines, logic flows, and hierarchies.",
+        parameters: MermaidTool
+    },
+    mafs: {
+        description: "Generate interactive math plots and physics coordinate systems via Mafs React components. Best for Calculus, Algebra, and Vectors.",
+        parameters: MafsTool
+    },
+    recharts: {
+        description: "Generate standard data visualizations (Line, Bar, Pie) using Recharts. Best for simple, clean charts and comparisons.",
+        parameters: RechartsTool
+    },
+    nivo: {
+        description: "Generate premium, highly interactive charts using Nivo (Line, Bar, Pie). Best for high-end data journalism, complex datasets, and smooth transitions.",
+        parameters: RechartsTool // Re-use the same schema as it fits Nivo too
+    },
+    chemistry: {
+        description: "Generate high-quality 2D molecular structures or chemical reactions using SMILES notation. Will be rendered with professional chemistry models.",
+        parameters: ChemistryTool
+    },
+    timeline: {
+        description: "Generate a chronological timeline of events using JSON.",
+        parameters: TimelineTool
+    },
+    svg: {
+        description: "Generate custom scientific or technical diagrams using raw SVG markup. Use viewBox. For an Excalidraw / hand-drawn look, add class='sketchy' to the <svg> tag. WARNING: Do NOT use 'NaN' for attributes. Calculate coordinates carefully.",
+        parameters: SVGTool
+    }
+};
+
+const VISUAL_SYSTEM_PROMPT = `You are an expert Pedagogical Illustrator.
+
+TASK: Create a visual artifact for the concept "{concept}" in "{subject}".
+INTENT: {intent}
+
+{sourceTextSection}
+
+CONTEXT:
+{context}
+
+INSTRUCTION: {instruction}
+
+Your task is to select and call the MOST appropriate tool to visualize this concept. 
+Every tool has specific syntax rules. Follow them exactly.
+WARNING: Mafs is 2D ONLY. For 3D shapes like Cones or Spheres, use SVG (2D projection).
+Mafs Tip: Use strings for formulas: <OfX y='x^2' /> is better than y={{(x) => x*x}}. NO arrow functions.`;
 
 const TEXT_SYSTEM_PROMPT = `You are a world-class {subject} educator.
 
@@ -59,7 +154,8 @@ REQUIREMENTS:
 
 FORMATTING:
 - **Bold** key terms
-- Use fenced code blocks with language tags for code
+- Use fenced code blocks ONLY for programming concepts (e.g. valid Python/JS algorithms).
+- DO NOT use code blocks for visualizations (no Matplotlib/Pyplot). Use the 'visual' tool for that.
 - Use LaTeX ($...$) for math formulas
 
 OUTPUT: You must return a JSON object with two fields:
@@ -67,47 +163,6 @@ OUTPUT: You must return a JSON object with two fields:
 2. summary: A one-line summary of the key point
 
 Do NOT wrap the output in markdown code blocks. Just return the structured data.`;
-
-const VISUAL_SYSTEM_PROMPT = `You are a technical illustrator creating a visual for: {subject}
-
-## Context
-- Subject: {subject}
-- Concept: "{concept}"
-- Tool to use: {tool}
-- Required output: {requiredArtifacts}
-
-## Previously Generated Content
-{context}
-
-## Director's Instruction
-{instruction}
-
-## Your Task
-Create a {tool} visualization that is:
-1. Directly relevant to the concept "{concept}" in {subject}
-2. Uses domain-appropriate terminology and structure
-3. Mobile-friendly (vertical layout, aspect ratio 3:2 or 4:3)
-
-## Tool-Specific Syntax
-
-### Mermaid
-- Valid types: graph TD, sequenceDiagram, classDiagram, flowchart, etc
-- ALL labels with spaces MUST be quoted: A["User Input"]
-- Arrows: -->, --o, --x
-
-### SVG
-- Include viewBox, NO fixed width/height
-- Colors: Primary #3b82f6, Secondary #64748b, Accent #10b981
-- Clean, minimal design
-
-### Mafs
-- Return valid React JSX for Mafs components
-- Use Coordinates.Cartesian, Plot.OfX, etc.
-
-### Recharts
-- Return valid JSON with type, data array, and keys
-
-OUTPUT: Return the visualization code directly. Do NOT wrap in JSON. The system handles the JSON structure.`;
 
 const QUIZ_SYSTEM_PROMPT = `You are an assessment expert creating a question for: {subject}
 
@@ -279,40 +334,60 @@ export const generatorNode = async (state: ChapterGenState) => {
     else if (task.role === 'visual') {
         const prompt = ChatPromptTemplate.fromMessages([
             ["system", VISUAL_SYSTEM_PROMPT],
-            ["user", "Generate a {tool} visualization for '{concept}'."]
+            ["user", "Select the best tool and generate a visual for '{concept}' based on intent: {intent}"]
         ]);
 
         try {
-            const chain = prompt.pipe(visualizerModel.withStructuredOutput(VisualOutput, { name: "VisualDiagram", includeRaw: true }));
-            const response = await chain.invoke({
+            // Convert definitions into LangChain tools for bindTools
+            const tools = Object.entries(VisualTools).map(([name, config]) => {
+                return {
+                    name,
+                    description: config.description,
+                    schema: config.parameters
+                };
+            });
+
+            // Force the model to choose a tool
+            const modelWithTools = (visualizerModel as any).bindTools(tools);
+            const response = await modelWithTools.invoke(await prompt.format({
                 concept: conceptTitle,
-                tool: task.tool || 'mermaid',
+                intent: task.intent || "Clarify concept visually",
                 context: runningContext || "No context",
                 instruction: task.instruction,
                 subject: courseContext || 'general',
-                requiredArtifacts: artifacts
-            });
+                sourceTextSection: sourceTextSection
+            }));
 
             const duration = Date.now() - startTime;
-            tokenUsage = extractTokenUsage(response.raw);
+            tokenUsage = extractTokenUsage(response); // response here is the Raw message
 
-            console.log(`[Generator] Visual block (${task.tool}): ${duration}ms | ${tokenUsage.totalTokens} tokens`);
+            const toolCall = response.tool_calls?.[0];
 
-            // Check if parsed content exists
-            if (response.parsed?.code) {
-                generatedBlock = { type: 'visual', tool: task.tool, code: response.parsed.code, caption: response.parsed.caption || '' };
+            if (toolCall) {
+                const selectedTool = toolCall.name;
+                const args = toolCall.args as any;
+
+                console.log(`[Generator] Visual block: Agent CALLED ${selectedTool} | ${duration}ms | ${tokenUsage.totalTokens} tokens`);
+
+                generatedBlock = {
+                    type: 'visual',
+                    tool: selectedTool,
+                    code: args.code,
+                    caption: args.caption || ''
+                };
             } else {
-                throw new Error('AI returned empty or invalid visual response');
+                console.warn('[Generator] Model failed to use tool, attempting content fallback');
+                throw new Error("Model did not call a visualization tool.");
             }
         } catch (e) {
             errorMessage = e instanceof Error ? e.message : 'Unknown error';
-            console.error(`[Generator] Visual generation failed (${Date.now() - startTime}ms): ${errorMessage}`);
+            console.error(`[Generator] Visual agent failed (${Date.now() - startTime}ms): ${errorMessage}`);
 
             generatedBlock = {
                 type: 'visual',
-                tool: task.tool,
-                code: 'graph TD; A["Error"] --> B["Could Not Generate Visual"];',
-                caption: `Generation failed: ${errorMessage}`
+                tool: 'mermaid',
+                code: 'graph TD; A["Error"] --> B["Agent Synthesis Failed"];',
+                caption: `Visualization agent encountered an issue: ${errorMessage}`
             };
         }
     }

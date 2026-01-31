@@ -4,8 +4,8 @@ import { PlanItemSchema } from "../state";
 import { AIModelFactory } from "../../model-factory";
 
 const DirectorOutputSchema = z.object({
-    domain: z.string().describe("The detected domain: PROGRAMMING, STEM, HUMANITIES, LIFE_SCIENCES, or GENERAL"),
-    requiredArtifacts: z.string().describe("What artifacts this topic requires: code examples, formulas, timelines, etc."),
+    domain: z.string().describe("Granular domain: COMPUTING, MATHEMATICS, PHYSICAL_SCIENCES, SOCIAL_SCIENCES, HUMANITIES, LIFE_SCIENCES, MEDICINE, or GENERAL"),
+    requiredArtifacts: z.string().describe("Specific artifacts required: e.g., 'SMILES strings for molecule', 'Historical timeline', 'Calculus derivations', 'React code examples'"),
     plan: z.array(PlanItemSchema)
 });
 
@@ -23,7 +23,7 @@ export const directorNode = async (state: any) => {
     const prompt = ChatPromptTemplate.fromMessages([
         [
             "system",
-            `Role: Chief Learning Officer & Curriculum Architect.
+            `Role: Expert Curriculum Architect & Pedagogy Specialist.
 
 ## Course Context
 Subject: "{subject}"
@@ -31,53 +31,41 @@ Chapter: "{chapter}"
 ${sourceText ? `Source Material (User provided): "{sourceText}"` : ''}
 
 ## Your Task
-1. FIRST: Analyze the subject and concept to determine the DOMAIN and REQUIRED ARTIFACTS
-2. THEN: Design a micro-learning plan for: "{concept}" (Type: {type})
+1. FIRST: Classify the topic into a granular DOMAIN.
+2. SECOND: Detail the REQUIRED ARTIFACTS for this domain.
+3. THIRD: Design a micro-learning plan for "{concept}" (Type: {type}).
 
-## Domain Detection (YOU must determine this)
-Analyze the subject/concept and classify into ONE of:
-- PROGRAMMING: Web dev, JavaScript, Python, React, APIs, databases, software
-- STEM: Math, Physics, Chemistry, Engineering, Statistics
-- HUMANITIES: History, Geography, Politics, Economics, Philosophy
-- LIFE_SCIENCES: Biology, Medicine, Anatomy, Ecology
-- GENERAL: Everything else
+## Visual Planning (The "Intent" Pattern)
+For visual blocks, do NOT worry about the technical library. Instead, provide a clear, UNIQUE INTENT for each block.
+Avoid redundancy: If you already have a text explanation or a previous diagram, the next one should show a DIFFERENT perspective (e.g., "Orientation" vs "Calculation" vs "Constraint").
+- Example: "Show the hierarchical relationship between objects"
+- Example: "Plot the curve of diminishing returns"
+- Example: "Timeline of the major battles in the revolution"
+- Example: "Molecular structure of the catalyst"
 
-## Required Artifacts by Domain
-Based on the domain, specify what artifacts MUST be included:
-- PROGRAMMING: "working code examples with syntax highlighting, API usage, best practices"
-- STEM: "LaTeX formulas, derivations, worked numerical examples"
-- HUMANITIES: "specific dates, people, events, cause-effect chains"
-- LIFE_SCIENCES: "biological processes, anatomical diagrams, clinical examples"
+## Domain Capabilities (Reference for Visuals)
+Our system currently supports:
+- Logic/Flow Diagrams (Mermaid)
+- Math/Physics Plots (Mafs)
+- Data Charts (Recharts)
+- Molecular Strings (SMILES)
+- Chronological Lists (Timeline)
+- Custom Diagrams (SVG)
 
-## Block Types Available
-- text (variants: hook, definition, core, analogy, example, code_walkthrough)
-- visual (tools: mafs [math graphs], mermaid [flows/architecture], recharts [data], svg [diagrams])
-- recall_question (variants: flashcard, mcq)
+## Required Artifacts Guidelines
+- COMPUTING: "Production-ready code, memory safety tips, performance trade-offs"
+- CHEMISTRY: "SMILES molecular strings, reaction balancing, valence electron counts"
+- MATH/PHYSICS: "Derivation steps, coordinate plots, specific constant values"
+- ECONOMICS: "Supply/Demand equilibrium, macro-economic indicators"
+- HISTORY: "Contextual timelines, map markers, primary source perspectives"
 
 ## Planning Rules
-
-### For PROGRAMMING topics:
-- MUST include at least one "code_walkthrough" or "example" text block
-- Visual should be: mermaid (architecture/flow) or svg (UI mockup)
-- Instruction for text blocks MUST say "Include working code example"
-
-### For STEM topics:
-- MUST include formulas in LaTeX
-- Visual should be: mafs (function graphs) or svg (physics diagrams)
-- Instruction MUST say "Include formulas and derivation"
-
-### For all topics:
-- Keep analogies WITHIN the domain (no physics analogies for React!)
-- Ground content in the actual subject matter
-
-## Standard Flow
-1. Hook - Domain-relevant introduction
-2. Visual/Code - Diagram or code example
-3. Definition - Precise explanation with domain terminology
-4. Example/Walkthrough - Concrete application
-5. Active Recall - Domain-appropriate question`
+- For COMPUTING: Include code_walkthrough + "Architecture flow" intent
+- For MATH/PHYSICS: Include LaTeX derivation + "Coordinate function plot" intent
+- For CHEMISTRY: Include "Molecular structure" intent
+- For HISTORY: Include "Historical timeline" intent`
         ],
-        ["user", "Analyze and create the plan for '{concept}' in the {subject} course."]
+        ["user", "Analyze subject '{subject}' and concept '{concept}' to create a professional learning plan."]
     ]);
 
     const structuredModel = model.withStructuredOutput(DirectorOutputSchema);

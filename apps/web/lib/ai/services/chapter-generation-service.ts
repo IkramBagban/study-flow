@@ -252,4 +252,85 @@ export class ChapterGenerationService {
         // Placeholder for Visual/Quiz regeneration if needed
         return currentBlock;
     }
+
+    /**
+     * Regenerate a specific visual block based on user feedback
+     */
+    static async regenerateVisualBlock(
+        conceptId: string,
+        blockIndex: number,
+        feedback: string
+    ) {
+        // 1. Fetch Concept
+        const concept = await prisma.concept.findUnique({
+            where: { id: conceptId },
+            include: { chapter: { include: { module: { include: { course: true } } } } }
+        });
+        if (!concept) throw new Error("Concept not found");
+
+        const blocks = concept.content as any[];
+        const currentBlock = blocks[blockIndex];
+
+        if (!currentBlock || currentBlock.type !== 'visual') {
+            throw new Error("Invalid block for visual regeneration");
+        }
+
+        console.log(`[RegenerateVisual] Updating ${currentBlock.tool} block with feedback: "${feedback}"`);
+
+        // 2. Setup AI
+        const { AIModelFactory } = await import("../model-factory");
+        const { z } = await import("zod");
+
+        const visualizerModel = AIModelFactory.createModel({
+            provider: "google",
+            model: "gemini-2.0-flash",
+            temperature: 0.4
+        });
+
+        // 3. Define Schemas (Mirroring generator.ts)
+        const VisualOutput = z.object({
+            code: z.string().describe("The updated visualization code/JSON. Raw string/JSON only."),
+            caption: z.string().describe("Brief caption explaining the diagram")
+        });
+
+        // 4. Construct Prompt
+        const systemPrompt = `You are a specialized Visualization Engineer. 
+        Your task is to FIX or IMPROVE a specific diagram based on user feedback.
+        
+        CONTEXT: ${concept.chapter.module.course.subject} - ${concept.title}
+        TOOL: ${currentBlock.tool} (You MUST output code compatible with this tool)
+        
+        RULES:
+        - MAFS: Output strictly valid JSON structure: { type: 'plot', items: [...], domain: {...} }. NO JSX.
+        - MERMAID: Use 'graph TD' or 'sequenceDiagram'. Quote all labels: A["Label"].
+        - SVG: Return raw <svg> markup. No markdown fences.
+        - general: NO explanation text, just the JSON/Code object.
+        
+        PREVIOUS CODE:
+        ${currentBlock.code}
+        
+        USER FEEDBACK:
+        "${feedback}"
+        
+        Generate the corrected code/data.`;
+
+        // 5. Invoke AI
+        const chain = visualizerModel.withStructuredOutput(VisualOutput);
+        const result = await chain.invoke(systemPrompt);
+
+        // 6. Update Block & DB
+        blocks[blockIndex] = {
+            ...currentBlock,
+            code: result.code,
+            caption: result.caption
+        };
+
+        await prisma.concept.update({
+            where: { id: conceptId },
+            data: { content: blocks }
+        });
+
+        console.log(`[RegenerateVisual] Success. New code length: ${result.code.length}`);
+        return blocks[blockIndex];
+    }
 }
