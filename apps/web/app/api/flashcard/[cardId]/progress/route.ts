@@ -1,6 +1,6 @@
-
 import { prisma } from "@study-flow/db";
 import { NextRequest, NextResponse } from "next/server";
+import { FSRS, Rating, State, type FSRSCard } from "@/lib/fsrs";
 
 export async function POST(
     req: NextRequest,
@@ -10,7 +10,12 @@ export async function POST(
         const { cardId } = await params;
         const { rating } = await req.json(); // 1 (Again), 2 (Hard), 3 (Good), 4 (Easy)
 
-        // Fetch current state
+        // Validate rating
+        if (!rating || rating < 1 || rating > 4) {
+            return NextResponse.json({ error: "Invalid rating. Must be 1-4" }, { status: 400 });
+        }
+
+        // Fetch current card state
         const card = await prisma.flashcard.findUnique({
             where: { id: cardId }
         });
@@ -19,50 +24,49 @@ export async function POST(
             return NextResponse.json({ error: "Card not found" }, { status: 404 });
         }
 
-        // SuperMemo-2 (SM-2) Adaptation
-        // Rating 1 = Fail, 2 = Hard, 3 = Good, 4 = Easy
-        // We map 1->1, 2->3, 3->4, 4->5 for standard SM-2 quality (0-5)
-        const quality = rating === 1 ? 0 : rating === 2 ? 3 : rating === 3 ? 4 : 5;
+        // Convert Prisma card to FSRS card format
+        const fsrsCard: FSRSCard = {
+            due: card.due,
+            stability: card.stability,
+            difficulty: card.difficulty,
+            elapsedDays: card.elapsedDays,
+            scheduledDays: card.scheduledDays,
+            reps: card.reps,
+            lapses: card.lapses,
+            state: card.state as State,
+            lastReview: card.lastReview
+        };
 
-        let { box, interval, easeFactor } = card;
+        // Run FSRS algorithm
+        const fsrs = new FSRS();
+        const now = new Date();
+        const result = fsrs.next(fsrsCard, now, rating as Rating);
+        const newCard = result.card;
 
-        if (quality < 3) {
-            // Failed (Again)
-            box = 0;
-            interval = 1;
-        } else {
-            // Passed
-            if (box === 0) {
-                interval = 1;
-            } else if (box === 1) {
-                interval = 6;
-            } else {
-                interval = Math.ceil(interval * easeFactor);
-            }
-            box += 1;
-
-            // Update Ease Factor
-            // EF' = EF + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
-            easeFactor = easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
-            if (easeFactor < 1.3) easeFactor = 1.3;
-        }
-
-        // Calculate Next Review Date
-        const nextReview = new Date();
-        nextReview.setDate(nextReview.getDate() + interval);
-
-        // Update DB
+        // Update database with new FSRS state
         const updatedCard = await prisma.flashcard.update({
             where: { id: cardId },
             data: {
-                box,
-                interval,
-                easeFactor,
-                nextReview
+                due: newCard.due,
+                stability: newCard.stability,
+                difficulty: newCard.difficulty,
+                elapsedDays: newCard.elapsedDays,
+                scheduledDays: newCard.scheduledDays,
+                reps: newCard.reps,
+                lapses: newCard.lapses,
+                state: newCard.state,
+                lastReview: newCard.lastReview
             }
         });
 
-        return NextResponse.json(updatedCard);
+        // Return updated card with scheduling info
+        return NextResponse.json({
+            card: updatedCard,
+            nextReviewIn: newCard.scheduledDays > 0
+                ? `${newCard.scheduledDays} day${newCard.scheduledDays !== 1 ? 's' : ''}`
+                : 'soon',
+            state: State[newCard.state]
+        });
     } catch (error) {
         console.error("Failed to update flashcard progress", error);
         return NextResponse.json({ error: "Failed to update progress" }, { status: 500 });
