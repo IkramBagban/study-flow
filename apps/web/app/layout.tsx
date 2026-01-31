@@ -5,6 +5,8 @@ import "katex/dist/katex.min.css";
 import "mafs/core.css";
 import "mafs/font.css";
 
+import { Toaster } from "sonner";
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -31,6 +33,7 @@ export default function RootLayout({
             <feDisplacementMap in="SourceGraphic" in2="noise" scale="2" />
           </filter>
         </svg>
+        <Toaster />
       </body>
     </html>
   );

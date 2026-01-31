@@ -3,6 +3,7 @@ import { prisma } from "@study-flow/db";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Brain } from "lucide-react";
 
 export default async function CourseLayout({
     children,
@@ -34,11 +35,21 @@ export default async function CourseLayout({
         <div className="min-h-screen bg-background text-foreground flex">
             {/* Sidebar Navigation (Modules) */}
             <aside className="w-80 border-r border-border h-screen sticky top-0 overflow-y-auto bg-card/50 hidden lg:block">
-                <div className="p-6 border-b border-border">
-                    <Link href={`/course/${course.id}`} className="block">
-                        <h1 className="font-bold text-xl leading-tight hover:text-primary transition-colors">{course.title}</h1>
+                <div className="p-6 border-b border-border space-y-4">
+                    <div>
+                        <Link href={`/course/${course.id}`} className="block">
+                            <h1 className="font-bold text-xl leading-tight hover:text-primary transition-colors">{course.title}</h1>
+                        </Link>
+                        <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{course.description}</p>
+                    </div>
+
+                    <Link
+                        href={`/course/${course.id}/flashcards`}
+                        className="flex items-center gap-2 w-full p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20 font-medium text-sm"
+                    >
+                        <Brain className="size-4" />
+                        Practice Flashcards
                     </Link>
-                    <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{course.description}</p>
                 </div>
                 <div className="p-4 space-y-6">
                     {course.modules.map((module, i) => (

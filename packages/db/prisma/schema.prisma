@@ -74,15 +74,16 @@ model Verification {
 }
 
 model Course {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   title       String
   description String?
   subject     String
   goal        String
   level       String
   modules     Module[]
+  flashcards  Flashcard[]
 
   status         String @default("DRAFT") // DRAFT, GENERATING, READY
   assessmentData Json? // Stores concept check results and quiz scores
@@ -119,7 +120,8 @@ model Chapter {
 
   estimatedTime String?
 
-  concepts Concept[]
+  concepts   Concept[]
+  flashcards Flashcard[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -134,12 +136,40 @@ model Concept {
   title     String
   order     Int
 
-  type    String // "priming", "core", "application"
-  isReady Boolean @default(false)
-  content Json? // Stores hook, explanation, examples (structured)
+  type       String // "priming", "core", "application"
+  isReady    Boolean     @default(false)
+  content    Json? // Stores hook, explanation, examples (structured)
+  flashcards Flashcard[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("concept")
+}
+
+model Flashcard {
+  id        String   @id @default(cuid())
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  chapterId String?
+  chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  conceptId String?
+  concept   Concept? @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  front       String
+  back        String
+  explanation String?
+  type        String  @default("basic") // basic, code, math
+
+  // Spaced Repetition (SRS) State
+  box        Int      @default(0) // Leitner box (0-5)
+  interval   Int      @default(0) // Days to next review
+  easeFactor Float    @default(2.5) // SM-2 ease factor
+  nextReview DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([courseId, nextReview])
+  @@map("flashcard")
 }

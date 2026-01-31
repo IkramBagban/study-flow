@@ -68,6 +68,9 @@ export class ChapterGenerationService {
                     }
                 });
 
+                // Extract and Save Flashcards
+                await this.saveFlashcardsForConcept(blocks, chapter.module.course.id, chapter.id, concept.id);
+
                 await new Promise(r => setTimeout(r, 1000)); // Rate limit
 
             } catch (error) {
@@ -188,6 +191,9 @@ export class ChapterGenerationService {
                         isReady: finalBlocks.length > 0
                     }
                 });
+
+                // Extract and Save Flashcards
+                await this.saveFlashcardsForConcept(finalBlocks, chapter.module.course.id, chapter.id, concept.id);
 
                 callbacks.onConceptComplete(concept.title, finalBlocks.length);
                 await new Promise(r => setTimeout(r, 1000));
@@ -332,5 +338,35 @@ export class ChapterGenerationService {
 
         console.log(`[RegenerateVisual] Success. New code length: ${result.code.length}`);
         return blocks[blockIndex];
+    }
+
+
+    /**
+     * Helper: Save generated quiz blocks as Flashcards
+     */
+    private static async saveFlashcardsForConcept(blocks: any[], courseId: string, chapterId: string, conceptId: string) {
+        const flashcardBlocks = blocks.filter(b => b.type === 'quiz' || b.type === 'recall_question');
+
+        if (flashcardBlocks.length > 0) {
+            try {
+                // Clear existing cards for this concept to avoid duplicates on regeneration
+                await prisma.flashcard.deleteMany({ where: { conceptId } });
+
+                console.log(`[Flashcards] Saving ${flashcardBlocks.length} cards for concept: ${conceptId}`);
+                await prisma.flashcard.createMany({
+                    data: flashcardBlocks.map(block => ({
+                        courseId,
+                        chapterId,
+                        conceptId,
+                        front: block.question,
+                        back: block.answer,
+                        explanation: block.explanation,
+                        type: block.variant === 'code' ? 'code' : 'basic',
+                    }))
+                });
+            } catch (e) {
+                console.error("[Flashcards] Failed to save flashcards:", e);
+            }
+        }
     }
 }
