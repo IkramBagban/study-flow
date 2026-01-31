@@ -33,18 +33,25 @@ export class ChapterGenerationService {
             try {
                 console.log(`\n--- [Concept ${index + 1}/${conceptsToGenerate.length}] "${concept.title}" ---`);
 
+                // Extract source text from course if available
+                const sourceData = chapter.module.course.sourceData as any;
+                const sourceText = sourceData?.sourceText || sourceData?.text || '';
+
                 // INVOKE THE GRAPH
                 const result = await chapterGeneratorGraph.invoke({
                     courseContext: chapter.module.course.subject,
                     chapterTitle: chapter.title,
                     conceptTitle: concept.title,
                     conceptType: concept.type,
+                    sourceText: sourceText,
                     // Initial State
                     plan: [],
                     currentTaskIndex: 0,
                     blocks: [],
                     runningContext: "",
                     errors: [],
+                    detectedDomain: "",
+                    requiredArtifacts: "",
                     tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
                 }, { recursionLimit: 100 });
 
@@ -114,13 +121,17 @@ export class ChapterGenerationService {
                 // Initialize State Tracking
                 let previousBlocksCount = 0;
 
-                // Create the stream
+                // Extract source text from course if available
+                const sourceData = chapter.module.course.sourceData as any;
+                const sourceText = sourceData?.sourceText || sourceData?.text || '';
+
                 // Create the stream with "values" mode to get full state accumulation
                 const stream = await chapterGeneratorGraph.stream({
                     courseContext: chapter.module.course.subject,
                     chapterTitle: chapter.title,
                     conceptTitle: concept.title,
                     conceptType: concept.type,
+                    sourceText: sourceText,
                     plan: [],
                     currentTaskIndex: 0,
                     blocks: [],
@@ -130,6 +141,8 @@ export class ChapterGenerationService {
                     feedback: null,
                     retryCount: 0,
                     errors: [],
+                    detectedDomain: "",
+                    requiredArtifacts: "",
                     tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
                 }, { streamMode: "values", recursionLimit: 100 });
 

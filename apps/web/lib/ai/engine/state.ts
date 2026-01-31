@@ -38,10 +38,15 @@ export type PlanItem = z.infer<typeof PlanItemSchema>;
 
 export const ChapterGenAnnotation = Annotation.Root({
     // Inputs
-    courseContext: Annotation<string>(), // "Physics 101: Mechanics"
-    chapterTitle: Annotation<string>(),  // "Newton's Laws"
-    conceptTitle: Annotation<string>(),  // "Inertia"
-    conceptType: Annotation<string>(),   // "Core Concept"
+    courseContext: Annotation<string>(), // "react" or "calculus"
+    chapterTitle: Annotation<string>(),  // "Hooks and State"
+    conceptTitle: Annotation<string>(),  // "useState"
+    conceptType: Annotation<string>(),   // "core"
+    sourceText: Annotation<string>(),    // User-provided learning material
+
+    // AI-Detected (set by Director)
+    detectedDomain: Annotation<string>(),      // "PROGRAMMING", "STEM", etc.
+    requiredArtifacts: Annotation<string>(),   // "code examples, API usage"
 
     // The Plan (Mutable)
     plan: Annotation<PlanItem[]>(),
