@@ -110,7 +110,7 @@ const VisualTools = {
         parameters: TimelineTool
     },
     svg: {
-        description: "Generate custom scientific or technical diagrams using raw SVG markup. Use viewBox. For an Excalidraw / hand-drawn look, add class='sketchy' to the <svg> tag. WARNING: Do NOT use 'NaN' for attributes. Calculate coordinates carefully.",
+        description: "Generate custom scientific or technical diagrams using raw SVG markup. Use viewBox. and add proper labels and text when needed. WARNING: Do NOT use 'NaN' for attributes. Calculate coordinates carefully.",
         parameters: SVGTool
     }
 };

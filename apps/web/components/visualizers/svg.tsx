@@ -1,8 +1,5 @@
 
-// "use client"
-
 import { AlertCircle } from "lucide-react"
-
 
 export function SVGDiagram({ code }: { code: string }) {
     // Clean up code: remove markdown code blocks if present
@@ -21,15 +18,12 @@ export function SVGDiagram({ code }: { code: string }) {
         )
     }
 
-    // Check for "sketchy" intent
-    const isSketchy = cleanCode.includes('class="sketchy"') || cleanCode.includes("sketchy: true");
-
     return (
         <div
             className="w-full flex justify-center items-center bg-background/50 rounded-xl border border-border shadow-inner overflow-hidden min-h-[300px]"
         >
             <div
-                className={`w-full [&>svg]:w-full [&>svg]:h-auto [&>svg]:max-h-[600px] p-6 md:p-10 ${isSketchy ? 'sketchy' : ''}`}
+                className="w-full [&>svg]:w-full [&>svg]:h-auto [&>svg]:max-h-[600px] p-6 md:p-10"
                 dangerouslySetInnerHTML={{ __html: cleanCode }}
             />
         </div>

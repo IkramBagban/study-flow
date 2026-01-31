@@ -153,13 +153,6 @@
   --sidebar-ring: oklch(0.55 0.12 250); 
 }
 
-@layer utilities {
-  /* Hand-drawn / Excalidraw effect */
-  .sketchy {
-    filter: url('#sketchy-filter');
-  }
-}
-
 /* Base styles */
 @layer base {
   * {
