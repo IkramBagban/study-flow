@@ -7,7 +7,10 @@ import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { prisma } from "@study-flow/db";
 
-export default async function QuizPage(props: { params: Promise<{ id: string; chapterId: string }> }) {
+export default async function QuizPage(props: {
+    params: Promise<{ id: string; chapterId: string }>,
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
     const params = await props.params;
     const session = await auth.api.getSession({ headers: await headers() });
 
@@ -55,7 +58,7 @@ export default async function QuizPage(props: { params: Promise<{ id: string; ch
             </header>
 
             <main className="flex-1 p-6 md:p-10">
-                <QuizView quiz={quiz} userId={session.user.id} />
+                <QuizView quiz={quiz} userId={session.user.id} searchParams={await props.searchParams} />
             </main>
         </div>
     );

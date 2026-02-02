@@ -1,25 +1,78 @@
-"use client";
+"use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, ArrowRight, BrainCircuit, PlayCircle, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import confetti from 'canvas-confetti';
 import { submitQuizAttempt } from "@/app/actions/quiz";
 import Link from "next/link";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
 interface QuizViewProps {
     quiz: any; // Type strictly if possible
     userId: string;
+    searchParams?: any;
 }
 
-export function QuizView({ quiz, userId }: QuizViewProps) {
+export function QuizView({ quiz, userId, searchParams }: QuizViewProps) {
+    const router = useRouter();
+    const pathname = usePathname();
+
     const [started, setStarted] = useState(false);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<string, string>>({}); // questionId -> optionId
     const [submitted, setSubmitted] = useState(false);
     const [result, setResult] = useState<any>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Initialize state based on URL params
+    useEffect(() => {
+        const mode = searchParams?.mode;
+        const attemptId = searchParams?.attemptId;
+
+        if (mode === 'attempt') {
+            setStarted(true);
+            setSubmitted(false);
+            setResult(null);
+            setAnswers({});
+            setCurrentQuestionIndex(0);
+        } else if (attemptId) {
+            const attempt = quiz.attempts.find((a: any) => a.id === attemptId);
+            if (attempt) {
+                loadAttempt(attempt);
+            }
+        } else {
+            // Default: Entry Screen
+            setStarted(false);
+            setSubmitted(false);
+            setResult(null);
+        }
+    }, [searchParams, quiz.attempts]);
+
+    const loadAttempt = (attempt: any) => {
+        // Reconstruct result object from attempt data
+        const restoredResult = {
+            ...attempt,
+            percentage: attempt.score,
+            performanceLevel: attempt.metadata?.performanceLevel || (attempt.score >= 80 ? "Excellent" : attempt.score >= 60 ? "Good" : "Needs Improvement"),
+            growthAreas: attempt.metadata?.growthAreas || [],
+            areasToReview: attempt.metadata?.areasToReview || [],
+            correctCount: attempt.answers ? attempt.answers.filter((a: any) => a.isCorrect).length : Math.round((attempt.score / 100) * quiz.questions.length),
+        };
+
+        const restoredAnswers: Record<string, string> = {};
+        if (attempt.answers && Array.isArray(attempt.answers)) {
+            attempt.answers.forEach((ans: any) => {
+                restoredAnswers[ans.questionId] = ans.optionId;
+            });
+        }
+
+        setResult(restoredResult);
+        setAnswers(restoredAnswers);
+        setSubmitted(true);
+        setStarted(true);
+    };
 
     // If there are no questions, show empty state
     if (!quiz.questions || quiz.questions.length === 0) {
@@ -35,11 +88,16 @@ export function QuizView({ quiz, userId }: QuizViewProps) {
 
     const currentQuestion = quiz.questions[currentQuestionIndex];
     const totalQuestions = quiz.questions.length;
-    // Progress bar calculation (questions answered / total)
-    const answeredCount = Object.keys(answers).length;
-    const progress = (answeredCount / totalQuestions) * 100;
 
-    const handleStart = () => setStarted(true);
+    const handleStart = () => {
+        // Update URL to active mode
+        router.push(`${pathname}?mode=attempt`);
+    };
+
+    const handleViewAttempt = (attempt: any) => {
+        // Update URL to specific attempt
+        router.push(`${pathname}?attemptId=${attempt.id}`);
+    };
 
     const handleSelectOption = (optionId: string) => {
         if (submitted) return;
@@ -66,8 +124,17 @@ export function QuizView({ quiz, userId }: QuizViewProps) {
             }));
 
             const response = await submitQuizAttempt(quiz.id, formattedAnswers);
+
+            // After submit, we just show the result. 
+            // Optional: We could redirect to ?attemptId=new_id to make it shareable immediately
+            // But for smoother UX, we just show it. 
+            // If they refresh, they go to main menu unless we change URL.
+            // Let's replace URL with the new attempt URL so refresh works.
+            router.replace(`${pathname}?attemptId=${response.id}`);
+
             setResult(response);
             setSubmitted(true);
+            setStarted(true);
 
             if (response.score > 70) {
                 confetti({
@@ -83,21 +150,69 @@ export function QuizView({ quiz, userId }: QuizViewProps) {
         }
     };
 
-    if (!started) {
+    if (!started && !submitted) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8 animate-in fade-in slide-in-from-bottom-5">
-                <div className="size-24 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-4 shadow-lg shadow-primary/20">
-                    <BrainCircuit size={48} />
+            <div className="flex flex-col items-center min-h-[60vh] text-center space-y-12 animate-in fade-in slide-in-from-bottom-5 max-w-4xl mx-auto">
+                {/* Hero Section */}
+                <div className="space-y-6 flex flex-col items-center">
+                    <div className="size-24 bg-primary/10 rounded-full flex items-center justify-center text-primary shadow-lg shadow-primary/20 ring-4 ring-primary/5">
+                        <BrainCircuit size={48} />
+                    </div>
+                    <div className="space-y-4 max-w-lg">
+                        <h1 className="text-4xl font-bold tracking-tight">{quiz.title}</h1>
+                        <p className="text-lg text-muted-foreground leading-relaxed">
+                            {quiz.questions.length} questions to text your knowledge.
+                        </p>
+                    </div>
+                    <Button size="lg" onClick={handleStart} className="rounded-full px-12 py-7 text-lg shadow-xl shadow-primary/20 hover:scale-105 transition-all font-semibold">
+                        Start New Attempt <PlayCircle className="ml-2 size-5" />
+                    </Button>
                 </div>
-                <div className="space-y-4 max-w-lg">
-                    <h1 className="text-4xl font-bold tracking-tight">{quiz.title}</h1>
-                    <p className="text-lg text-muted-foreground">
-                        Ready to check your understanding? We've prepared {quiz.questions.length} questions based on this chapter's content.
-                    </p>
-                </div>
-                <Button size="lg" onClick={handleStart} className="rounded-full px-12 py-6 text-lg shadow-xl shadow-primary/20 hover:scale-105 transition-transform">
-                    Start Quiz <PlayCircle className="ml-2 size-5" />
-                </Button>
+
+                {/* History Section */}
+                {quiz.attempts && quiz.attempts.length > 0 && (
+                    <div className="w-full max-w-2xl space-y-6 pt-8 border-t border-border/50">
+                        <div className="flex items-center justify-between px-2">
+                            <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                                <span className="size-2 rounded-full bg-primary" />
+                                Recent Attempts
+                            </h3>
+                            <span className="text-sm text-muted-foreground">{quiz.attempts.length} attempts</span>
+                        </div>
+
+                        <div className="grid gap-3">
+                            {quiz.attempts.map((attempt: any) => (
+                                <button
+                                    key={attempt.id}
+                                    onClick={() => handleViewAttempt(attempt)}
+                                    className="group flex items-center justify-between p-4 rounded-2xl bg-card border border-border/50 hover:border-primary/50 hover:shadow-md transition-all text-left"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className={cn(
+                                            "flex flex-col items-center justify-center size-12 rounded-xl text-xs font-bold leading-none",
+                                            attempt.score >= 80 ? "bg-green-500/10 text-green-700" :
+                                                attempt.score >= 60 ? "bg-blue-500/10 text-blue-700" :
+                                                    "bg-orange-500/10 text-orange-700"
+                                        )}>
+                                            <span>{Math.round(attempt.score)}%</span>
+                                        </div>
+                                        <div>
+                                            <div className="font-medium text-foreground">
+                                                {new Date(attempt.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {new Date(attempt.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-primary opacity-0 group-hover:opacity-100 transition-opacity text-sm font-medium">
+                                        View Details <ArrowRight size={16} />
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         )
     }

@@ -20,7 +20,7 @@ export async function getChapterQuiz(chapterId: string) {
             attempts: {
                 where: { userId: session.user.id },
                 orderBy: { createdAt: "desc" },
-                take: 1
+                take: 20
             }
         }
     });
