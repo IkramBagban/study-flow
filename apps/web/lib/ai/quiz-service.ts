@@ -49,10 +49,17 @@ export async function generateQuiz(
 
 export async function gradeQuiz(
   questions: any[],
-  userAnswers: any[]
+  userAnswers: any[],
+  stats?: { score: number; correctCount: number; totalQuestions: number }
 ) {
   const prompt = ChatPromptTemplate.fromMessages([
-    ["system", `You are an expert tutor grading a student's quiz. Your goal is to provide specific, actionable advice.`],
+    ["system", `You are an expert tutor grading a student's quiz.
+    
+    Context:
+    Score: {score}%
+    Correct: {correctCount}/{totalQuestions}
+    
+    Your goal is to provide specific, actionable advice based on this performance.`],
     ["user", `Original Questions:
         {questions}
         
@@ -60,9 +67,9 @@ export async function gradeQuiz(
         {userAnswers}
         
         Task:
-        1. Calculate the score.
-        2. Identify Knowledge Gaps: Specifically list which concepts the student struggled with.
-        3. Recommended Focus Areas: List the specific names of topics/concepts the user should review.
+        1. Assign a Performance Level based on the score: "Excellent" (>80%), "Good" (60-80%), or "Needs Improvement" (<60%).
+        2. Identify Growth Areas: Strengths and skills demonstrated. Provide as a list of short phrases (e.g., "Understanding of X").
+        3. List Areas to Review: Specific concepts/topics the user got wrong. Provide as a list of short phrases.
         4. Provide holistic feedback encouraging growth.
         5. For each question, explain the correct answer clearly.`]
   ]);
@@ -71,6 +78,9 @@ export async function gradeQuiz(
 
   return await chain.invoke({
     questions: JSON.stringify(questions),
-    userAnswers: JSON.stringify(userAnswers)
+    userAnswers: JSON.stringify(userAnswers),
+    score: stats?.score || 0,
+    correctCount: stats?.correctCount || 0,
+    totalQuestions: stats?.totalQuestions || 0
   });
 }

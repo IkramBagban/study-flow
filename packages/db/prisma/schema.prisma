@@ -239,7 +239,11 @@ model QuizAttempt {
 
   // Storing detailed answers as JSON since it's just for history/review
   // structure: { questionId: string, optionId: string, isCorrect: boolean }[]
+  // structure: { questionId: string, optionId: string, isCorrect: boolean }[]
   answers Json
+
+  // Stores structured feedback: { performanceLevel: string, growthAreas: string[], areasToReview: string[], corrections: any[] }
+  metadata Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

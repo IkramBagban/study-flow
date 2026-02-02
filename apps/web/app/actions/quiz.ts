@@ -127,9 +127,21 @@ export async function submitQuizAttempt(
     }));
 
     let feedback = "Great job!";
+    let performanceAnalysis: any = {};
+
     try {
-        const aiFeedback = await gradeQuiz(questionsForAI, userAnswersForAI);
+        const aiFeedback = await gradeQuiz(
+            questionsForAI,
+            userAnswersForAI,
+            { score, correctCount, totalQuestions: quiz.questions.length }
+        );
         feedback = aiFeedback.feedback;
+        performanceAnalysis = {
+            performanceLevel: aiFeedback.performanceLevel,
+            growthAreas: aiFeedback.growthAreas,
+            areasToReview: aiFeedback.areasToReview,
+            corrections: aiFeedback.corrections
+        };
     } catch (e) {
         console.error("AI Grading failed", e);
         feedback = `You scored ${Math.round(score)}%. Review your answers to see what you missed.`;
@@ -143,11 +155,24 @@ export async function submitQuizAttempt(
             score: score,
             feedback: feedback,
             answers: detailedAnswers as any,
+            metadata: performanceAnalysis || {},
         }
     });
 
     revalidatePath(`/courses/${quiz.courseId}`);
-    return attempt;
+
+    // Return structured result for frontend consumption
+    return {
+        ...attempt,
+        score,
+        percentage: Math.round(score),
+        correctCount,
+        totalQuestions: quiz.questions.length,
+        performanceLevel: performanceAnalysis.performanceLevel || (score >= 80 ? "Excellent" : score >= 60 ? "Good" : "Needs Improvement"),
+        growthAreas: performanceAnalysis.growthAreas || [],
+        areasToReview: performanceAnalysis.areasToReview || [],
+        corrections: performanceAnalysis.corrections || [],
+    };
 }
 
 export async function getCourseQuiz(courseId: string) {

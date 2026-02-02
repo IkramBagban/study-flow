@@ -105,25 +105,104 @@ export function QuizView({ quiz, userId }: QuizViewProps) {
     if (submitted && result) {
         return (
             <div className="max-w-3xl mx-auto space-y-8 animate-in zoom-in-95 duration-500 pb-20">
-                <div className="text-center space-y-6 py-8">
-                    <div className="inline-flex items-center justify-center px-4 py-1.5 rounded-full bg-secondary text-sm font-medium text-secondary-foreground">
-                        {result.score >= 80 ? "Excellent Mastery!" : result.score >= 50 ? "Good Effort!" : "Review Needed"}
+                <div className="text-center space-y-8 py-8">
+                    {/* Performance Badge */}
+                    <div className={cn(
+                        "inline-flex items-center justify-center px-6 py-2 rounded-full text-base font-semibold shadow-sm",
+                        result.performanceLevel === "Excellent" ? "bg-green-500/10 text-green-700 ring-1 ring-green-500/20" :
+                            result.performanceLevel === "Good" ? "bg-blue-500/10 text-blue-700 ring-1 ring-blue-500/20" :
+                                "bg-orange-500/10 text-orange-700 ring-1 ring-orange-500/20"
+                    )}>
+                        {result.performanceLevel || "Quiz Complete"}
                     </div>
-                    <div className="flex flex-col items-center">
-                        <span className="text-7xl font-bold text-primary tracking-tighter">{Math.round(result.score)}%</span>
-                        <span className="text-muted-foreground font-medium uppercase tracking-widest text-sm mt-2">Accuracy Score</span>
+
+                    {/* Main Score & Stats */}
+                    <div className="grid grid-cols-3 gap-8 max-w-xl mx-auto items-center">
+                        <div className="text-right space-y-1">
+                            <div className="text-3xl font-bold text-foreground">
+                                {result.correctCount ?? Math.round((result.percentage / 100) * quiz.questions.length)}
+                                <span className="text-muted-foreground/50 text-xl font-medium mx-1">/</span>
+                                {quiz.questions.length}
+                            </div>
+                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Correct</div>
+                        </div>
+
+                        <div className="relative flex justify-center">
+                            <div className="size-32 rounded-full border-8 border-primary/10 flex items-center justify-center relative">
+                                <span className="text-4xl font-black text-primary tracking-tight">{result.percentage || Math.round(result.score)}%</span>
+                                <svg className="absolute inset-0 -rotate-90 text-primary" viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray="289" strokeDashoffset={289 - (289 * (result.percentage || 0) / 100)} className="transition-all duration-1000 ease-out" />
+                                </svg>
+                            </div>
+                        </div>
+
+                        <div className="text-left space-y-1">
+                            <div className="text-3xl font-bold text-foreground">{quiz.questions.length}</div>
+                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Questions</div>
+                        </div>
                     </div>
                 </div>
 
-                <div className="p-8 rounded-3xl bg-card border border-border shadow-sm space-y-4 relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
-                    <h3 className="font-semibold text-xl flex items-center gap-2">
-                        <Target className="size-6 text-primary" />
-                        Performance Insight
-                    </h3>
-                    <p className="text-muted-foreground leading-relaxed text-lg">
-                        {result.feedback}
-                    </p>
+                <div className="grid gap-6 md:grid-cols-2">
+                    {/* Performance Insight - Enhanced Design */}
+                    <div className="md:col-span-2 p-8 rounded-3xl bg-gradient-to-br from-card to-secondary/30 border border-border/50 shadow-sm relative overflow-hidden group">
+                        <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-primary to-primary/30" />
+                        <div className="absolute -right-20 -top-20 size-64 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors duration-500" />
+
+                        <div className="relative z-10 space-y-4">
+                            <h3 className="font-semibold text-xl flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-background shadow-sm border border-border/50">
+                                    <Target className="size-5 text-primary" />
+                                </div>
+                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
+                                    AI Tutor Feedback
+                                </span>
+                            </h3>
+                            <p className="text-muted-foreground leading-relaxed text-lg font-medium">
+                                "{result.feedback}"
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Growth Areas */}
+                    {result.growthAreas && result.growthAreas.length > 0 && (
+                        <div className="p-8 rounded-3xl bg-card border border-border/50 shadow-sm space-y-6">
+                            <h4 className="font-semibold text-xl flex items-center gap-3">
+                                <span className="p-2 rounded-lg bg-green-500/10 text-green-600">
+                                    <CheckCircle2 className="size-5" />
+                                </span>
+                                Growth Areas
+                            </h4>
+                            <ul className="space-y-4">
+                                {result.growthAreas.map((area: string, i: number) => (
+                                    <li key={i} className="text-muted-foreground flex items-start gap-3 text-base leading-relaxed">
+                                        <span className="mt-2 size-2 rounded-full bg-green-500/50 flex-shrink-0" />
+                                        <span>{area}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {/* Focus Areas */}
+                    {result.areasToReview && result.areasToReview.length > 0 && (
+                        <div className="p-8 rounded-3xl bg-card border border-border/50 shadow-sm space-y-6">
+                            <h4 className="font-semibold text-xl flex items-center gap-3">
+                                <span className="p-2 rounded-lg bg-orange-500/10 text-orange-600">
+                                    <BrainCircuit className="size-5" />
+                                </span>
+                                Areas to Review
+                            </h4>
+                            <ul className="space-y-4">
+                                {result.areasToReview.map((area: string, i: number) => (
+                                    <li key={i} className="text-muted-foreground flex items-start gap-3 text-base leading-relaxed">
+                                        <span className="mt-2 size-2 rounded-full bg-orange-500/50 flex-shrink-0" />
+                                        <span>{area}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-6 pt-8">

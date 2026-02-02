@@ -34,7 +34,11 @@ export const UserAnswersSchema = z.object({
 export const GradingResultSchema = z.object({
     score: z.number(),
     totalQuestions: z.number(),
+    percentage: z.number(),
+    performanceLevel: z.enum(["Excellent", "Good", "Needs Improvement"]),
     feedback: z.string(),
+    growthAreas: z.array(z.string()).describe("Specific skills or concepts to improve"),
+    areasToReview: z.array(z.string()).describe("Specific topics to revisit"),
     corrections: z.array(z.object({
         questionId: z.string(),
         correct: z.boolean(),
