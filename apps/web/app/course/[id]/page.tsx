@@ -3,6 +3,7 @@ import { prisma } from "@study-flow/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { RegenerateButton } from "@/components/regenerate-button";
+import { ScrollText, PlayCircle } from "lucide-react";
 
 export default async function CoursePage(props: { params: Promise<{ id: string }> }) {
     const params = await props.params;
@@ -81,6 +82,21 @@ export default async function CoursePage(props: { params: Promise<{ id: string }
                         </div>
                     </div>
                 ))}
+            </div>
+
+            {/* Final Exam Section */}
+            <div className="mt-12 p-8 rounded-3xl bg-gradient-to-br from-primary/5 via-primary/10 to-background border border-primary/20 text-center space-y-6">
+                <div className="space-y-2">
+                    <h2 className="text-3xl font-bold">Course Final Exam</h2>
+                    <p className="text-lg text-muted-foreground max-w-xl mx-auto">
+                        Verify your mastery of {course.subject} with a comprehensive assessment covering all modules.
+                    </p>
+                </div>
+                <Link href={`/course/${course.id}/quiz`}>
+                    <button className="px-8 py-4 bg-primary text-primary-foreground font-semibold rounded-full hover:scale-105 transition-transform shadow-lg shadow-primary/20 flex items-center gap-2 mx-auto">
+                        Start Final Exam
+                    </button>
+                </Link>
             </div>
         </>
     );

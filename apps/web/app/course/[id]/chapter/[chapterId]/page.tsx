@@ -153,13 +153,17 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
                         </span>
                     </Link>
 
-                    {/* Quiz (Coming Soon) */}
-                    <div className="group relative flex items-center justify-center w-12 h-12 rounded-2xl bg-secondary/50 border border-transparent opacity-60 cursor-not-allowed">
-                        <ScrollText className="size-5 text-muted-foreground" />
-                        <span className="absolute right-full mr-3 px-2 py-1 rounded bg-popover text-popover-foreground text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                            Quiz (Coming Soon)
+                    {/* Quiz (Active) */}
+                    <Link
+                        href={`/course/${chapter.module.course.id}/chapter/${chapter.id}/quiz`}
+                        className="group relative flex items-center justify-center w-12 h-12 rounded-2xl bg-background border border-border/50 shadow-sm hover:scale-110 hover:shadow-md hover:border-primary/50 transition-all duration-300"
+                        title="Take Chapter Quiz"
+                    >
+                        <ScrollText className="size-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                        <span className="absolute right-full mr-3 px-2 py-1 rounded bg-popover text-popover-foreground text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-sm">
+                            Take Quiz
                         </span>
-                    </div>
+                    </Link>
 
                     {/* Test (Coming Soon) */}
                     <div className="group relative flex items-center justify-center w-12 h-12 rounded-2xl bg-secondary/50 border border-transparent opacity-60 cursor-not-allowed">

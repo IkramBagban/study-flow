@@ -19,7 +19,7 @@ export async function generateQuiz(
   text: string
 ) {
   const prompt = ChatPromptTemplate.fromMessages([
-    ["system", `You are an expert tutor creating a diagnostic assessment.`],
+    ["system", `You are an expert tutor creating a comprehensive diagnostic assessment.`],
     ["user", `Context:
         - User wants to learn: {topic}
         - Current Knowledge Level: {level}
@@ -27,8 +27,10 @@ export async function generateQuiz(
         - Source Material: "{text}"
         
         Task:
-        Generate 3-5 multiple choice questions (MCQs) to test the user's understanding of the key concepts.
-        The questions should be appropriate for a {level} level learner.`]
+        Generate 5-10 multiple choice questions (MCQs) that cover the *breadth* of the provided material.
+        - Ensure questions target the main concepts, definitions, and key processes described.
+        - Avoid focusing on narrow details unless they are critical.
+        - The questions should be appropriate for a {level} level learner.`]
   ]);
 
   const chain = prompt.pipe(generatorModel);
@@ -46,7 +48,7 @@ export async function gradeQuiz(
   userAnswers: any[]
 ) {
   const prompt = ChatPromptTemplate.fromMessages([
-    ["system", `You are an expert tutor grading a student's quiz.`],
+    ["system", `You are an expert tutor grading a student's quiz. Your goal is to provide specific, actionable advice.`],
     ["user", `Original Questions:
         {questions}
         
@@ -55,8 +57,10 @@ export async function gradeQuiz(
         
         Task:
         1. Calculate the score.
-        2. Provide holistic feedback on what the student understands and what they missed.
-        3. For each question, confirm if it was correct and explain why (especially if wrong).`]
+        2. Identify Knowledge Gaps: Specifically list which concepts the student struggled with.
+        3. Recommended Focus Areas: List the specific names of topics/concepts the user should review.
+        4. Provide holistic feedback encouraging growth.
+        5. For each question, explain the correct answer clearly.`]
   ]);
 
   const chain = prompt.pipe(graderModel);

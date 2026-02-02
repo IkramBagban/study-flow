@@ -2,6 +2,7 @@ import { AIModelFactory, currentAIConfig } from "../model-factory";
 import { DomainMapSchema, CourseStructureSchema, AssessmentOutputSchema } from "../schemas";
 import { prisma } from "@study-flow/db";
 import { z } from "zod";
+import { ingestResource } from "@/lib/rag/vector-store";
 
 const model = AIModelFactory.createModel(currentAIConfig);
 
@@ -224,6 +225,18 @@ export class CourseStructureService {
         });
 
         console.log(`[CourseArchitect] ✅ Course Created: ${course.id}`);
+
+        if (input.sourceText) {
+            console.log(`[CourseArchitect] 📥 Ingesting Source Text (${input.sourceText.length} chars)`);
+            // Ingest loosely in background (don't await strictly if we want speed, but for now await to be safe)
+            try {
+                await ingestResource(course.id, input.sourceText, 'text', 'Initial Logic Source');
+                console.log(`[CourseArchitect]  Source Text Ingested & Embedded`);
+            } catch (e) {
+                console.error(`[CourseArchitect]  Failed to ingest source text`, e);
+            }
+        }
+
         return course;
     }
 }

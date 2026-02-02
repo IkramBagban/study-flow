@@ -5,25 +5,28 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  extensions = [vector]
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String        @id @default(cuid())
   name          String?
-  email         String    @unique
+  email         String        @unique
   emailVerified Boolean?
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   sessions      Session[]
   accounts      Account[]
   courses       Course[]
+  quizAttempts  QuizAttempt[]
 
   @@map("user")
 }
@@ -84,6 +87,8 @@ model Course {
   level       String
   modules     Module[]
   flashcards  Flashcard[]
+  quizzes     Quiz[]
+  resources   Resource[]
 
   status         String @default("DRAFT") // DRAFT, GENERATING, READY
   assessmentData Json? // Stores concept check results and quiz scores
@@ -122,6 +127,7 @@ model Chapter {
 
   concepts   Concept[]
   flashcards Flashcard[]
+  quizzes    Quiz[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -177,4 +183,94 @@ model Flashcard {
 
   @@index([courseId, due])
   @@map("flashcard")
+}
+
+model Quiz {
+  id        String   @id @default(cuid())
+  courseId  String?
+  course    Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  chapterId String?
+  chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  title     String
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("quiz")
+}
+
+model QuizQuestion {
+  id     String @id @default(cuid())
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  question    String
+  explanation String?
+  options     QuizOption[]
+
+  order Int
+
+  @@map("quiz_question")
+}
+
+model QuizOption {
+  id         String       @id @default(cuid())
+  questionId String
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  text      String
+  isCorrect Boolean
+
+  @@map("quiz_option")
+}
+
+model QuizAttempt {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  score    Float
+  feedback String? @db.Text // AI Feedback
+
+  // Storing detailed answers as JSON since it's just for history/review
+  // structure: { questionId: string, optionId: string, isCorrect: boolean }[]
+  answers Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("quiz_attempt")
+}
+
+model Resource {
+  id       String  @id @default(cuid())
+  courseId String
+  course   Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  content  String  @db.Text
+  type     String // "pdf", "text", "url"
+  fileName String?
+
+  embeddings Embedding[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("resource")
+}
+
+model Embedding {
+  id         String                 @id @default(uuid())
+  resourceId String
+  resource   Resource               @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  content    String                 @db.Text
+  vector     Unsupported("vector")?
+
+  createdAt DateTime @default(now())
+
+  @@map("embedding")
 }
