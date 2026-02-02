@@ -1,4 +1,5 @@
 import { prisma } from "@study-flow/db";
+import { searchSimilar } from "@/lib/rag/vector-store";
 
 /**
  * ChapterGenerationService
@@ -35,7 +36,21 @@ export class ChapterGenerationService {
 
                 // Extract source text from course if available
                 const sourceData = chapter.module.course.sourceData as any;
-                const sourceText = sourceData?.sourceText || sourceData?.text || '';
+                let sourceText = sourceData?.sourceText || sourceData?.text || '';
+                const useOnlyResources = sourceData?.useOnlyResources || false;
+
+                // RAG: Retrieve relevant context
+                try {
+                    const ragResults = await searchSimilar(chapter.module.course.id, `${chapter.title}: ${concept.title}`, 5);
+                    if (ragResults.length > 0) {
+                        const ragContext = ragResults.map(r => `[Excerpt]: ${r.content}`).join("\n\n");
+                        console.log(`[ChapterGen] 🔍 Retrieved ${ragResults.length} chunks from vector store`);
+                        // Append RAG context to sourceText
+                        sourceText = `${sourceText}\n\n=== RELEVANT COURSE MATERIAL ===\n${ragContext}`;
+                    }
+                } catch (e) {
+                    console.warn("[ChapterGen] RAG Search failed (ignoring):", e);
+                }
 
                 // INVOKE THE GRAPH
                 const result = await chapterGeneratorGraph.invoke({
@@ -126,7 +141,20 @@ export class ChapterGenerationService {
 
                 // Extract source text from course if available
                 const sourceData = chapter.module.course.sourceData as any;
-                const sourceText = sourceData?.sourceText || sourceData?.text || '';
+                let sourceText = sourceData?.sourceText || sourceData?.text || '';
+                const useOnlyResources = sourceData?.useOnlyResources || false;
+
+                // RAG: Retrieve relevant context
+                try {
+                    const ragResults = await searchSimilar(chapter.module.course.id, `${chapter.title}: ${concept.title}`, 5);
+                    if (ragResults.length > 0) {
+                        const ragContext = ragResults.map(r => `[Excerpt]: ${r.content}`).join("\n\n");
+                        console.log(`[Stream] 🔍 Retrieved ${ragResults.length} chunks from vector store`);
+                        sourceText = `${sourceText}\n\n=== RELEVANT COURSE MATERIAL ===\n${ragContext}`;
+                    }
+                } catch (e) {
+                    // Ignore RAG errors in stream to avoid crash
+                }
 
                 // Create the stream with "values" mode to get full state accumulation
                 const stream = await chapterGeneratorGraph.stream({
@@ -135,6 +163,7 @@ export class ChapterGenerationService {
                     conceptTitle: concept.title,
                     conceptType: concept.type,
                     sourceText: sourceText,
+                    useOnlyResources: useOnlyResources,
                     plan: [],
                     currentTaskIndex: 0,
                     blocks: [],

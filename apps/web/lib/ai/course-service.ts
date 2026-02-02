@@ -17,8 +17,8 @@ export class CourseService {
     /**
      * Generate domain map for a topic
      */
-    static async generateDomainMap(topic: string, goal: string, sourceText?: string) {
-        return CourseStructureService.generateDomainMap(topic, goal, sourceText);
+    static async generateDomainMap(topic: string, goal: string, sourceText?: string, useOnlyResources?: boolean) {
+        return CourseStructureService.generateDomainMap(topic, goal, sourceText, useOnlyResources);
     }
 
     /**
@@ -29,9 +29,10 @@ export class CourseService {
         goal: string,
         level: string,
         concepts: string[],
-        sourceText?: string
+        sourceText?: string,
+        useOnlyResources?: boolean
     ) {
-        return CourseStructureService.generateDiagnosticQuiz(topic, goal, level, concepts, sourceText);
+        return CourseStructureService.generateDiagnosticQuiz(topic, goal, level, concepts, sourceText, useOnlyResources);
     }
 
     /**
@@ -50,7 +51,8 @@ export class CourseService {
         goal: string,
         level: string,
         sourceText?: string,
-        assessmentData?: any
+        assessmentData?: any,
+        useOnlyResources?: boolean
     ) {
         return CourseStructureService.generateCourseBlueprint(
             userId,
@@ -58,7 +60,8 @@ export class CourseService {
             goal,
             level,
             sourceText,
-            assessmentData
+            assessmentData,
+            useOnlyResources
         );
     }
 

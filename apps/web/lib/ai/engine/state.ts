@@ -44,6 +44,7 @@ export const ChapterGenAnnotation = Annotation.Root({
     conceptTitle: Annotation<string>(),  // "useState"
     conceptType: Annotation<string>(),   // "core"
     sourceText: Annotation<string>(),    // User-provided learning material
+    useOnlyResources: Annotation<boolean | undefined>(),
 
     // AI-Detected (set by Director)
     detectedDomain: Annotation<string>(),      // "PROGRAMMING", "STEM", etc.

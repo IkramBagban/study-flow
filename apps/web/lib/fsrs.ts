@@ -227,11 +227,13 @@ export class FSRS {
     // FSRS Core Functions
 
     private initStability(rating: Rating): number {
-        return Math.max(0.1, this.w[rating - 1]);
+        return Math.max(0.1, this.w[rating - 1] ?? 0.1);
     }
 
     private initDifficulty(rating: Rating): number {
-        return Math.min(Math.max(this.w[4] - Math.exp(this.w[5] * (rating - 1)) + 1, 1), 10);
+        const w4 = this.w[4] ?? 1;
+        const w5 = this.w[5] ?? 1;
+        return Math.min(Math.max(w4 - Math.exp(w5 * (rating - 1)) + 1, 1), 10);
     }
 
     private forgettingCurve(elapsedDays: number, stability: number): number {
@@ -245,37 +247,47 @@ export class FSRS {
     }
 
     private nextDifficulty(d: number, rating: Rating): number {
-        const nextD = d - this.w[6] * (rating - 3);
-        return Math.min(Math.max(this.meanReversion(this.w[4], nextD), 1), 10);
+        const w6 = this.w[6] ?? 0;
+        const w4 = this.w[4] ?? 1;
+        const nextD = d - w6 * (rating - 3);
+        return Math.min(Math.max(this.meanReversion(w4, nextD), 1), 10);
     }
 
     private meanReversion(init: number, current: number): number {
-        return this.w[7] * init + (1 - this.w[7]) * current;
+        const w7 = this.w[7] ?? 0;
+        return w7 * init + (1 - w7) * current;
     }
 
     private nextRecallStability(card: FSRSCard, elapsedDays: number, rating: Rating): number {
         const retrievability = this.forgettingCurve(elapsedDays, card.stability);
-        const hardPenalty = rating === Rating.Hard ? this.w[15] : 1;
-        const easyBonus = rating === Rating.Easy ? this.w[16] : 1;
+        const hardPenalty = rating === Rating.Hard ? (this.w[15] ?? 1) : 1;
+        const easyBonus = rating === Rating.Easy ? (this.w[16] ?? 1) : 1;
+        const w8 = this.w[8] ?? 1;
+        const w9 = this.w[9] ?? 1;
+        const w10 = this.w[10] ?? 1;
 
         return (
             card.stability *
             (1 +
-                Math.exp(this.w[8]) *
+                Math.exp(w8) *
                 (11 - card.difficulty) *
-                Math.pow(card.stability, -this.w[9]) *
-                (Math.exp((1 - retrievability) * this.w[10]) - 1) *
+                Math.pow(card.stability, -w9) *
+                (Math.exp((1 - retrievability) * w10) - 1) *
                 hardPenalty *
                 easyBonus)
         );
     }
 
     private nextForgetStability(d: number, s: number, r: number): number {
+        const w11 = this.w[11] ?? 1;
+        const w12 = this.w[12] ?? 1;
+        const w13 = this.w[13] ?? 1;
+        const w14 = this.w[14] ?? 1;
         return (
-            this.w[11] *
-            Math.pow(d, -this.w[12]) *
-            (Math.pow(s + 1, this.w[13]) - 1) *
-            Math.exp((1 - r) * this.w[14])
+            w11 *
+            Math.pow(d, -w12) *
+            (Math.pow(s + 1, w13) - 1) *
+            Math.exp((1 - r) * w14)
         );
     }
 

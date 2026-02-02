@@ -16,7 +16,7 @@ const model = AIModelFactory.createModel({
 });
 
 export const directorNode = async (state: any) => {
-    const { courseContext, chapterTitle, conceptTitle, conceptType, sourceText } = state;
+    const { courseContext, chapterTitle, conceptTitle, conceptType, sourceText, useOnlyResources } = state;
 
     console.log(`[Director] Planning "${conceptTitle}" (${conceptType}) for: ${courseContext}`);
 
@@ -29,6 +29,7 @@ export const directorNode = async (state: any) => {
 Subject: "{subject}"
 Chapter: "{chapter}"
 ${sourceText ? `Source Material (User provided): "{sourceText}"` : ''}
+${useOnlyResources ? `IMPORTANT: STRICT MODE ENABLED. You MUST ONLY use the provided Source Material. If the concept is not covered, do not invent it.` : ''}
 
 ## Your Task
 1. FIRST: Classify the topic into a granular DOMAIN.
@@ -58,6 +59,7 @@ Our system currently supports:
 - MATH/PHYSICS: "Derivation steps, coordinate plots, specific constant values"
 - ECONOMICS: "Supply/Demand equilibrium, macro-economic indicators"
 - HISTORY: "Contextual timelines, map markers, primary source perspectives"
+- etc
 
 ## Planning Rules
 - For COMPUTING: Include code_walkthrough + "Architecture flow" intent
@@ -76,7 +78,8 @@ Our system currently supports:
         type: conceptType,
         subject: courseContext || 'general',
         chapter: chapterTitle || '',
-        sourceText: sourceText ? sourceText.substring(0, 3000) : ''
+        sourceText: sourceText ? sourceText.substring(0, 3000) : '',
+        useOnlyResources: useOnlyResources || false
     });
 
     console.log(`[Director] Detected domain: ${result.domain} | Artifacts: ${result.requiredArtifacts}`);

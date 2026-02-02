@@ -50,6 +50,7 @@ export const ArchitectAnnotation = Annotation.Root({
     goal: Annotation<string>(),
     level: Annotation<string>(),
     sourceText: Annotation<string | undefined>(),
+    useOnlyResources: Annotation<boolean | undefined>(),
 
     // Outputs
     domainMap: Annotation<z.infer<typeof DomainMapSchema> | null>(),

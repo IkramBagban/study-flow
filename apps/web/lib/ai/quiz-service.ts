@@ -16,7 +16,8 @@ export async function generateQuiz(
   topic: string,
   level: string,
   time: string,
-  text: string
+  text: string,
+  useOnlyResources?: boolean
 ) {
   const prompt = ChatPromptTemplate.fromMessages([
     ["system", `You are an expert tutor creating a comprehensive diagnostic assessment.`],
@@ -30,7 +31,10 @@ export async function generateQuiz(
         Generate 5-10 multiple choice questions (MCQs) that cover the *breadth* of the provided material.
         - Ensure questions target the main concepts, definitions, and key processes described.
         - Avoid focusing on narrow details unless they are critical.
-        - The questions should be appropriate for a {level} level learner.`]
+        - The questions should be appropriate for a {level} level learner.
+        
+        ${useOnlyResources ? "IMPORTANT: STRICT MODE ENABLED. You MUST ONLY ask questions that can be answered using the provided Source Material. Do not use outside knowledge." : ""}
+        `]
   ]);
 
   const chain = prompt.pipe(generatorModel);

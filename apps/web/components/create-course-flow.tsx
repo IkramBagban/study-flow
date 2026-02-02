@@ -56,6 +56,7 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
     const [topic, setTopic] = React.useState("")
     const [selectedLevel, setSelectedLevel] = React.useState("new")
     const [sourceText, setSourceText] = React.useState("")
+    const [useOnlyResources, setUseOnlyResources] = React.useState(false)
 
     // Generated Data
     const [conceptChecks, setConceptChecks] = React.useState<string[]>([])
@@ -137,6 +138,7 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                     goal: "Master the core concepts based on provided materials",
                     level: selectedLevel,
                     sourceText,
+                    useOnlyResources,
                     action: "domain-map"
                 })
             })
@@ -352,7 +354,19 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                                     value={sourceText}
                                     onChange={(e) => setSourceText(e.target.value)}
                                 />
-                                <p className="text-[10px] text-muted-foreground text-center">We currently support text sources up to 10,000 words.</p>
+                                <div className="flex items-center gap-2 mt-2">
+                                    <input
+                                        type="checkbox"
+                                        id="useOnlyResources"
+                                        checked={useOnlyResources}
+                                        onChange={(e) => setUseOnlyResources(e.target.checked)}
+                                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                                    />
+                                    <label htmlFor="useOnlyResources" className="text-xs text-muted-foreground select-none cursor-pointer">
+                                        Use <strong>only</strong> provided resources (Strict Mode)
+                                    </label>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground text-center mt-1">We currently support text sources up to 10,000 words.</p>
                             </div>
                         </div>
                     )}

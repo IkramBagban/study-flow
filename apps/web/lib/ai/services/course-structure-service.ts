@@ -15,12 +15,12 @@ export class CourseStructureService {
     /**
      * Phase A: Generate Domain Map (Delegates to Architect Analyzer Node)
      */
-    static async generateDomainMap(topic: string, goal: string, sourceText?: string) {
+    static async generateDomainMap(topic: string, goal: string, sourceText?: string, useOnlyResources?: boolean) {
         console.log(`[CourseStructure] 🚀 Generating Domain Map for "${topic}"`);
         const { analyzerNode } = await import("../engine/architect/nodes/analyzer");
 
         // Construct minimal state for the node
-        const state: any = { topic, goal, sourceText };
+        const state: any = { topic, goal, sourceText, useOnlyResources };
         const result = await analyzerNode(state);
 
         if (result.error) throw new Error(result.error);
@@ -49,7 +49,7 @@ export class CourseStructureService {
     /**
      * Phase B: Generate Diagnostic Quiz (Level 2 Implementation)
      */
-    static async generateDiagnosticQuiz(topic: string, goal: string, level: string, concepts: string[], sourceText?: string) {
+    static async generateDiagnosticQuiz(topic: string, goal: string, level: string, concepts: string[], sourceText?: string, useOnlyResources?: boolean) {
         console.log(`[CourseStructure] 📝 Generating diagnostic quiz for "${topic}"`);
         const { ChatPromptTemplate } = await import("@langchain/core/prompts");
         const { AssessmentOutputSchema } = await import("../schemas");
@@ -63,6 +63,7 @@ export class CourseStructureService {
              Known Concepts: {concepts}
              Goal: {goal}
              ${sourceText ? "Source Material: {sourceText}" : ""}
+             ${useOnlyResources ? "IMPORTANT: STRICT MODE. Use ONLY the provided Source Material to generate questions." : ""}
              
              Requirements:
              - 3-5 high-value questions testing conceptual understanding.
@@ -132,7 +133,8 @@ export class CourseStructureService {
         goal: string,
         level: string,
         sourceText?: string,
-        assessmentData?: any
+        assessmentData?: any,
+        useOnlyResources?: boolean
     ) {
         return this.createCourse({
             userId,
@@ -140,7 +142,8 @@ export class CourseStructureService {
             goal,
             level,
             sourceText,
-            assessmentData
+            assessmentData,
+            useOnlyResources
         });
     }
 
@@ -156,6 +159,7 @@ export class CourseStructureService {
         goal: string;
         level: string;
         sourceText?: string;
+        useOnlyResources?: boolean;
         assessmentData?: any;
     }) {
         console.log(`[CourseArchitect] 🎓 Creating course: "${input.topic}"`);
@@ -169,6 +173,7 @@ export class CourseStructureService {
             goal: input.goal,
             level: input.level,
             sourceText: input.sourceText,
+            useOnlyResources: input.useOnlyResources,
             domainMap: null,
             structure: null,
             error: null

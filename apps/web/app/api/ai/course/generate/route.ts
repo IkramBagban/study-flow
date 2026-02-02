@@ -12,6 +12,7 @@ const GenerateSchema = z.object({
     level: z.string(),
     action: z.enum(["domain-map", "assess", "course-structure", "infer"]),
     sourceText: z.string().optional(),
+    useOnlyResources: z.boolean().optional(),
     // Optional fields
     concepts: z.array(z.string()).optional(), // For 'assess' phase
     selectedConcepts: z.array(z.string()).optional(), // For 'infer' phase
@@ -30,16 +31,16 @@ export const maxDuration = 60; // Allow longer interaction for AI generation
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { topic, goal, level, action, concepts, selectedConcepts, quizResults, assessmentData, sourceText } = GenerateSchema.parse(body);
+        const { topic, goal, level, action, concepts, selectedConcepts, quizResults, assessmentData, sourceText, useOnlyResources } = GenerateSchema.parse(body);
 
         if (action === "domain-map") {
-            const domainMap = await CourseService.generateDomainMap(topic, goal, sourceText);
+            const domainMap = await CourseService.generateDomainMap(topic, goal, sourceText, useOnlyResources);
             return NextResponse.json(domainMap);
         }
 
         if (action === "assess") {
             if (!concepts) return NextResponse.json({ error: "Concepts required for assessment" }, { status: 400 });
-            const assessment = await CourseService.generateDiagnosticQuiz(topic, goal, level, concepts, sourceText);
+            const assessment = await CourseService.generateDiagnosticQuiz(topic, goal, level, concepts, sourceText, useOnlyResources);
             return NextResponse.json(assessment);
         }
 
@@ -63,7 +64,8 @@ export async function POST(req: NextRequest) {
                 goal,
                 level,
                 sourceText,
-                assessmentData
+                assessmentData,
+                useOnlyResources
             );
             return NextResponse.json({ courseId: course.id });
         }
