@@ -10,14 +10,23 @@ import { splitText } from "./text-splitter";
  * 3. Generates embeddings.
  * 4. Stores vectors in the database.
  */
-export async function ingestResource(courseId: string, content: string, type: string, fileName?: string) {
+export async function ingestResource(
+    courseId: string,
+    content: string,
+    type: string,
+    fileName?: string,
+    storage?: { url: string; key: string, metadata?: any }
+) {
     // 1. Create Resource Record
     const resource = await prisma.resource.create({
         data: {
             courseId,
-            content,
+            content, // Extracted text
             type,
-            fileName
+            fileName,
+            url: storage?.url,
+            fileKey: storage?.key,
+            metadata: storage?.metadata ?? undefined
         }
     });
 

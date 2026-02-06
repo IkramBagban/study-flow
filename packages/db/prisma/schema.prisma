@@ -259,6 +259,11 @@ model Resource {
   type     String // "pdf", "text", "url"
   fileName String?
 
+  // External Storage Fields
+  url      String? // Public URL (Cloudinary/S3)
+  fileKey  String? // Storage ID for deletion
+  metadata Json? // { size: number, pageCount: number, author: string }
+
   embeddings Embedding[]
 
   createdAt DateTime @default(now())

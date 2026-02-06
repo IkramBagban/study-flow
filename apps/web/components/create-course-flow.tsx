@@ -128,6 +128,10 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
         localStorage.removeItem(STORAGE_KEY);
     }
 
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const [isDragging, setIsDragging] = React.useState(false);
+    const [uploadedFiles, setUploadedFiles] = React.useState<{ name: string; size: number }[]>([]);
+
     const handleGenerateDomain = async () => {
         setIsLoading(true)
         try {
@@ -159,6 +163,75 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
             setIsLoading(false)
         }
     }
+
+    const processFiles = async (files: FileList | File[]) => {
+        if (!files || files.length === 0) return;
+
+        setIsLoading(true);
+        try {
+            const formData = new FormData();
+            Array.from(files).forEach(file => {
+                formData.append("file", file);
+            });
+
+            const res = await fetch("/api/ai/tools/parse-pdf", {
+                method: "POST",
+                body: formData
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                if (data.text) {
+                    setSourceText(prev => prev + (prev ? "\n\n" : "") + data.text);
+                    // Add to file list
+                    const newFiles = Array.from(files).map(f => ({ name: f.name, size: f.size }));
+                    setUploadedFiles(prev => [...prev, ...newFiles]);
+                }
+            } else {
+                console.error("Parse failed", await res.text());
+            }
+        } catch (error) {
+            console.error("Failed to parse files", error);
+        } finally {
+            setIsLoading(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
+
+    const removeFile = (index: number) => {
+        setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+        // Note: We can't easily remove the text segment from sourceText just by index 
+        // without complex tracking, so we leave the text for now or clear it all if all files removed.
+        if (uploadedFiles.length === 1) {
+            setSourceText(""); // Clear text if last file removed
+        }
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) processFiles(e.target.files);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (e.dataTransfer.files) processFiles(e.dataTransfer.files);
+    };
+
+    const formatSize = (bytes: number) => {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
 
     const handleGenerateAssessment = async () => {
         setIsLoading(true)
@@ -322,7 +395,19 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                 </div>
 
                 {/* Content Area */}
-                <div className="p-8 overflow-y-auto scrollbar-hide flex-1">
+                <div
+                    className="p-8 overflow-y-auto scrollbar-hide flex-1 relative"
+                    onDragOver={step === 'source' ? handleDragOver : undefined}
+                    onDragLeave={step === 'source' ? handleDragLeave : undefined}
+                    onDrop={step === 'source' ? handleDrop : undefined}
+                >
+                    {isDragging && step === 'source' && (
+                        <div className="absolute inset-0 z-50 bg-background/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200 border-2 border-dashed border-primary m-4 rounded-xl">
+                            <Upload className="size-16 text-primary animate-bounce mb-4" />
+                            <h3 className="text-2xl font-bold text-primary">Drop files to Parse</h3>
+                            <p className="text-muted-foreground">PDFs, Text, Markdown supported</p>
+                        </div>
+                    )}
                     {step === "source" && (
                         <div className="flex flex-col gap-10 text-center animate-in zoom-in-95 duration-500">
                             <div className="space-y-4">
@@ -335,7 +420,19 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                             </div>
 
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
-                                <SourceButton icon={Upload} label="Upload files" disabled />
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    accept=".pdf,.txt,.md"
+                                    multiple
+                                    onChange={handleFileUpload}
+                                />
+                                <SourceButton
+                                    icon={Upload}
+                                    label="Upload files"
+                                    onClick={() => fileInputRef.current?.click()}
+                                />
                                 <SourceButton icon={Link2} label="Websites" iconColor="text-red-400" disabled />
                                 <SourceButton icon={HardDrive} label="Drive" iconColor="text-blue-400" disabled />
                                 <SourceButton
@@ -345,6 +442,26 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                                     active={true}
                                 />
                             </div>
+
+                            {/* Uploaded Files List */}
+                            {uploadedFiles.length > 0 && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 w-full text-left">
+                                    {uploadedFiles.map((file, i) => (
+                                        <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-600">
+                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                <FileText className="size-4 shrink-0" />
+                                                <span className="text-xs font-medium truncate">{file.name}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] opacity-70">{formatSize(file.size)}</span>
+                                                <button onClick={(e) => { e.stopPropagation(); removeFile(i); }} className="hover:text-destructive transition-colors">
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
 
                             <div className="flex flex-col gap-2 text-left">
                                 <label className="text-xs font-medium text-muted-foreground uppercase ml-1">Paste Source Material</label>
