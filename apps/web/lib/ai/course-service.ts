@@ -52,7 +52,10 @@ export class CourseService {
         level: string,
         sourceText?: string,
         assessmentData?: any,
-        useOnlyResources?: boolean
+        useOnlyResources?: boolean,
+        files?: any[],
+        domainMap?: any,
+        structure?: any
     ) {
         return CourseStructureService.generateCourseBlueprint(
             userId,
@@ -61,7 +64,10 @@ export class CourseService {
             level,
             sourceText,
             assessmentData,
-            useOnlyResources
+            useOnlyResources,
+            files,
+            domainMap,
+            structure
         );
     }
 

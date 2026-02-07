@@ -11,7 +11,13 @@ const model = AIModelFactory.createModel({
 export const analyzerNode = async (state: ArchitectState) => {
     const { topic, goal, sourceText, useOnlyResources } = state;
 
-    console.log(`[LANGGRAPH-V2] 🧠 Analyzer Node: Mapping domain for "${topic}" (Strict Mode: ${!!useOnlyResources})`);
+    console.log(`[LANGGRAPH-V2] 🧠 Analyzer Node: Mapping domain for "${topic}" (Strict Mode: ${!!(useOnlyResources)})`);
+
+    // SKIP IF ALREADY EXISTS
+    if (state.domainMap) {
+        console.log(`[LANGGRAPH-V2] 🧠 Analyzer Node: Skipping generation, using provided Domain Map.`);
+        return { domainMap: state.domainMap };
+    }
 
     const prompt = ChatPromptTemplate.fromMessages([
         ["system", `You are an expert curriculum designer.

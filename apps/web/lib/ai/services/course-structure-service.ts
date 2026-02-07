@@ -134,7 +134,10 @@ export class CourseStructureService {
         level: string,
         sourceText?: string,
         assessmentData?: any,
-        useOnlyResources?: boolean
+        useOnlyResources?: boolean,
+        files?: any[],
+        domainMap?: any,
+        structure?: any
     ) {
         return this.createCourse({
             userId,
@@ -143,7 +146,10 @@ export class CourseStructureService {
             level,
             sourceText,
             assessmentData,
-            useOnlyResources
+            useOnlyResources,
+            files,
+            domainMap,
+            structure
         });
     }
 
@@ -161,6 +167,9 @@ export class CourseStructureService {
         sourceText?: string;
         useOnlyResources?: boolean;
         assessmentData?: any;
+        files?: any[];
+        domainMap?: any;
+        structure?: any;
     }) {
         console.log(`[CourseArchitect] 🎓 Creating course: "${input.topic}"`);
 
@@ -174,8 +183,8 @@ export class CourseStructureService {
             level: input.level,
             sourceText: input.sourceText,
             useOnlyResources: input.useOnlyResources,
-            domainMap: null,
-            structure: null,
+            domainMap: input.domainMap || null,
+            structure: input.structure || null,
             error: null
         });
 
@@ -231,9 +240,57 @@ export class CourseStructureService {
 
         console.log(`[CourseArchitect] ✅ Course Created: ${course.id}`);
 
-        if (input.sourceText) {
+        if (input.files && input.files.length > 0) {
+            console.log(`[CourseArchitect] 📥 Processing ${input.files.length} Files`);
+
+            // Link uploaded files to the course
+            for (const file of input.files) {
+                try {
+                    if (file.id) {
+                        // Link Existing Resource (uploaded earlier in flow)
+                        await prisma.resource.update({
+                            where: { id: file.id },
+                            data: { courseId: course.id }
+                        });
+                        console.log(`[CourseArchitect] 🔗 Linked existing resource ${file.id} to new course ${course.id}`);
+                    } else {
+                        // Create Resource Record (New)
+                        const resource = await prisma.resource.create({
+                            data: {
+                                courseId: course.id,
+                                fileName: file.name, // Correct field name
+                                type: file.url?.includes('.pdf') ? 'pdf' : 'text',
+                                url: file.url || "",
+                                fileKey: file.key || "", // Correct field name
+                                status: "PROCESSING",
+                                content: file.text ? file.text.substring(0, 100) + "..." : "", // Store snippet or full content if needed
+                                metadata: {
+                                    size: file.size,
+                                    pageCount: file.pageCount
+                                }
+                            }
+                        });
+
+                        // Trigger Background Ingestion (via Redis Queue)
+                        if (file.text) {
+                            const { ingestionQueue } = await import("@/lib/queue/client");
+                            await ingestionQueue.add('ingest', {
+                                resourceId: resource.id,
+                                content: file.text,
+                                courseId: course.id
+                            });
+                            console.log(`[CourseArchitect] 🚀 Queued ingestion for ${file.name} (Job ID: ${resource.id})`);
+                        }
+                    }
+                } catch (e) {
+                    console.error(`[CourseArchitect] Failed to link file ${file.name}`, e);
+                }
+            }
+        }
+
+        // Legacy single text ingestion (keep for backward compat or direct paste)
+        if (input.sourceText && (!input.files || input.files.length === 0)) {
             console.log(`[CourseArchitect] 📥 Ingesting Source Text (${input.sourceText.length} chars)`);
-            // Ingest loosely in background (don't await strictly if we want speed, but for now await to be safe)
             try {
                 await ingestResource(course.id, input.sourceText, 'text', 'Initial Logic Source');
                 console.log(`[CourseArchitect]  Source Text Ingested & Embedded`);

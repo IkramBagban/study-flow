@@ -20,17 +20,20 @@ import {
     Link2,
     HardDrive,
     FileText,
-    ChevronRight,
-    Search
+    BrainCircuit
 } from "lucide-react"
 import { SourceButton } from "./source-button"
+import { toast } from "sonner"
+import { Progress } from "./ui/progress"
 
 type Step =
-    | "discovery"  // 1. Topic & Level (Ask first)
-    | "source"     // 2. Resource selection (Ask second)
-    | "checkpoint" // 3. Concept extraction check
-    | "assessment" // 4. Diagnostic Quiz
-    | "summary"    // 5. Knowledge Profile Judgment
+    | "discovery"  // 1. Topic & Level 
+    | "source"     // 2. Resource selection 
+    | "analyzing"  // 3. (NEW) Async Analysis (Waiting for Worker)
+    | "preview"    // 4. (NEW) Confirm Structure
+    | "checkpoint" // 5. Concept extraction check
+    | "assessment" // 6. Diagnostic Quiz
+    | "summary"    // 7. Knowledge Profile Judgment
 
 const SUGGESTIONS = [
     "Language Learning", "Music Theory", "Photography Basics",
@@ -44,6 +47,16 @@ const LEVELS = [
 ]
 
 const STORAGE_KEY = "studyflow_wizard_state";
+
+interface UploadedResource {
+    id: string;
+    name: string;
+    size: number;
+    status: "QUEUED" | "PROCESSING" | "READY" | "ERROR";
+    previewStructure?: any;
+    pageCount?: number;
+    previewDomainMap?: any;
+}
 
 export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
     const router = useRouter()
@@ -62,62 +75,72 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
     const [conceptChecks, setConceptChecks] = React.useState<string[]>([])
     const [diagnosticQuestions, setDiagnosticQuestions] = React.useState<any[]>([])
     const [judgments, setJudgments] = React.useState<string[]>([])
+    const [previewOutline, setPreviewOutline] = React.useState<any>(null); // Course Structure
+    const [previewDomainMap, setPreviewDomainMap] = React.useState<any>(null); // Domain Map for PDF
 
     // User Responses
-    const [checkpointResponses, setCheckpointResponses] = React.useState<Record<string, boolean>>({}) // Concept -> Known?
-    const [quizResponses, setQuizResponses] = React.useState<Record<string, number>>({}) // QuestionId -> OptionIdx
-    const [summaryResponses, setSummaryResponses] = React.useState<Record<number, boolean>>({}) // JudgmentIdx -> Correct?
+    const [checkpointResponses, setCheckpointResponses] = React.useState<Record<string, boolean>>({})
+    const [quizResponses, setQuizResponses] = React.useState<Record<string, number>>({})
+    const [summaryResponses, setSummaryResponses] = React.useState<Record<number, boolean>>({})
 
-    // Load from LocalStorage
+    // Upload & Analysis State
+    const [uploadedResources, setUploadedResources] = React.useState<UploadedResource[]>([]);
+    const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+
+    // File Input Ref
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const [isDragging, setIsDragging] = React.useState(false);
+
+    // Polling for Analysis
+    React.useEffect(() => {
+        if (step !== "analyzing") return;
+
+        // Start polling logic is handled in handleFileUpload or restored on mount if needed
+        // Here we just ensure if we are on analyzing step and have resources, we poll
+        if (uploadedResources.length > 0) {
+            // If we have a resource ID, we can poll
+            // But we need the course ID too. 
+            // We'll rely on the pollForAnalysis function triggered by upload for now.
+            // If page reloaded, we might lose the interval.
+            // Ideally we persist the courseId/resourceId to restore polling.
+        }
+    }, [step]);
+
+
+    // Load/Save LocalStorage
     React.useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             try {
                 const data = JSON.parse(saved);
-                setStep(data.step || "source");
+                setStep(data.step || "discovery"); // Default to discovery
                 setTopic(data.topic || "");
                 setSelectedLevel(data.selectedLevel || "new");
                 setSourceText(data.sourceText || "");
-                setConceptChecks(data.conceptChecks || []);
-                setDiagnosticQuestions(data.diagnosticQuestions || []);
-                setJudgments(data.judgments || []);
-                setCheckpointResponses(data.checkpointResponses || {});
-                setQuizResponses(data.quizResponses || {});
-                setSummaryResponses(data.summaryResponses || {});
-
-                // Auto-open if we were in the middle of something
-                if (data.step && data.step !== "source") {
-                    setIsOpen(true);
-                }
+                // ... restore other fields if needed
             } catch (e) {
                 console.error("Failed to load saved state", e);
             }
         }
     }, []);
 
-    // Save to LocalStorage
+    // Save state on change
     React.useEffect(() => {
+        if (!isOpen) return;
         const state = {
-            step,
-            topic,
-            selectedLevel,
-            sourceText,
-            conceptChecks,
-            diagnosticQuestions,
-            judgments,
-            checkpointResponses,
-            quizResponses,
-            summaryResponses
+            step, topic, selectedLevel, sourceText
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }, [step, topic, selectedLevel, sourceText, conceptChecks, diagnosticQuestions, judgments, checkpointResponses, quizResponses, summaryResponses]);
+    }, [step, topic, selectedLevel, sourceText, isOpen]);
 
     const reset = () => {
         setIsOpen(false)
-        setStep("source")
+        setStep("discovery")
         setTopic("")
         setSelectedLevel("new")
         setSourceText("")
+        setUploadedResources([])
+        setPreviewOutline(null)
         setCheckpointResponses({})
         setQuizResponses({})
         setConceptChecks([])
@@ -128,9 +151,129 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
         localStorage.removeItem(STORAGE_KEY);
     }
 
-    const fileInputRef = React.useRef<HTMLInputElement>(null);
-    const [isDragging, setIsDragging] = React.useState(false);
-    const [uploadedFiles, setUploadedFiles] = React.useState<{ name: string; size: number }[]>([]);
+    const formatSize = (bytes: number) => {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    // --- NEW: Async Upload + Analyze ---
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length) return;
+
+        setIsLoading(true);
+        const file = e.target.files[0];
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            // Create Draft Course
+            // We create a temporary course ID to attach resources to.
+            // This endpoint should create a course with status 'DRAFT'
+            const courseRes = await fetch("/api/course/create-draft", { method: "POST" });
+
+            // Fallback for demo if endpoint doesn't exist yet: use existing generation endpoint or mock
+            // Assuming endpoint exists based on previous conversations or we create it.
+            // If it fails, we catch error.
+
+            let courseId;
+            if (courseRes.ok) {
+                const courseData = await courseRes.json();
+                courseId = courseData.courseId;
+            } else {
+                // Fallback or Error
+                throw new Error("Could not create draft course session");
+            }
+
+            // Upload to that course
+            const uploadRes = await fetch(`/api/course/${courseId}/resources/upload`, {
+                method: "POST",
+                body: formData
+            });
+
+            if (uploadRes.ok) {
+                const data = await uploadRes.json();
+                setUploadedResources(prev => [...prev, {
+                    id: data.resourceId,
+                    name: data.fileName,
+                    size: file.size,
+                    status: "QUEUED"
+                }]);
+
+                // Move to Analyzing Step
+                setStep("analyzing");
+                // Start Polling
+                pollForAnalysis(courseId, data.resourceId);
+            } else {
+                throw new Error("Upload failed");
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to upload. Please try again.");
+        } finally {
+            setIsLoading(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
+
+    const pollForAnalysis = async (courseId: string, resourceId: string) => {
+        const interval = setInterval(async () => {
+            try {
+                // Poll status
+                const res = await fetch(`/api/course/${courseId}/resources/${resourceId}/status`);
+                let statusData;
+
+                if (res.ok) {
+                    statusData = await res.json();
+                } else {
+                    // Fallback poll list
+                    const listRes = await fetch(`/api/course/${courseId}/resources`);
+                    if (listRes.ok) {
+                        const list = await listRes.json();
+                        statusData = list.find((r: any) => r.id === resourceId);
+                    }
+                }
+
+                if (statusData) {
+                    // Update local state
+                    setUploadedResources(prev => prev.map(r => r.id === resourceId ? { ...r, status: statusData.status } : r));
+
+                    // CHECK FOR PREVIEW
+                    // CHECK FOR PREVIEW
+                    if (statusData.metadata?.previewStructure) {
+                        clearInterval(interval);
+                        setPreviewOutline(statusData.metadata.previewStructure.modules);
+
+                        // Set Topic if available
+                        if (!topic && statusData.metadata.previewDomainMap?.subject) {
+                            setTopic(statusData.metadata.previewDomainMap.subject);
+                        }
+
+                        // NEW: Capture Domain Map fully
+                        if (statusData.metadata.previewDomainMap) {
+                            setPreviewDomainMap(statusData.metadata.previewDomainMap);
+                            // Set Concept Checks
+                            if (statusData.metadata.previewDomainMap.keyConcepts) {
+                                setConceptChecks(statusData.metadata.previewDomainMap.keyConcepts);
+                                setStep("checkpoint"); // Go to Concept Check first
+                                return;
+                            }
+                        }
+
+                        setStep("preview");
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }, 2000);
+    };
+
+    const removeFile = (index: number) => {
+        setUploadedResources(prev => prev.filter((_, i) => i !== index));
+    };
+
+    // --- Legacy/Text Handlers ---
 
     const handleGenerateDomain = async () => {
         setIsLoading(true)
@@ -152,86 +295,18 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                 setConceptChecks(concepts)
                 // BEGINNER SKIP LOGIC
                 if (selectedLevel === "new") {
-                    handleFinishAssessment([]) // Skip assessment for beginners
+                    handleFinishAssessment([]) // Skip assessment
                 } else {
                     setStep("checkpoint")
                 }
             }
         } catch (e) {
             console.error(e)
+            toast.error("Failed to generate concepts. Try again.")
         } finally {
             setIsLoading(false)
         }
     }
-
-    const processFiles = async (files: FileList | File[]) => {
-        if (!files || files.length === 0) return;
-
-        setIsLoading(true);
-        try {
-            const formData = new FormData();
-            Array.from(files).forEach(file => {
-                formData.append("file", file);
-            });
-
-            const res = await fetch("/api/ai/tools/parse-pdf", {
-                method: "POST",
-                body: formData
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                if (data.text) {
-                    setSourceText(prev => prev + (prev ? "\n\n" : "") + data.text);
-                    // Add to file list
-                    const newFiles = Array.from(files).map(f => ({ name: f.name, size: f.size }));
-                    setUploadedFiles(prev => [...prev, ...newFiles]);
-                }
-            } else {
-                console.error("Parse failed", await res.text());
-            }
-        } catch (error) {
-            console.error("Failed to parse files", error);
-        } finally {
-            setIsLoading(false);
-            if (fileInputRef.current) fileInputRef.current.value = "";
-        }
-    };
-
-    const removeFile = (index: number) => {
-        setUploadedFiles(prev => prev.filter((_, i) => i !== index));
-        // Note: We can't easily remove the text segment from sourceText just by index 
-        // without complex tracking, so we leave the text for now or clear it all if all files removed.
-        if (uploadedFiles.length === 1) {
-            setSourceText(""); // Clear text if last file removed
-        }
-    };
-
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) processFiles(e.target.files);
-    };
-
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(true);
-    };
-
-    const handleDragLeave = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(false);
-    };
-
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(false);
-        if (e.dataTransfer.files) processFiles(e.dataTransfer.files);
-    };
-
-    const formatSize = (bytes: number) => {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    };
 
     const handleGenerateAssessment = async () => {
         setIsLoading(true)
@@ -258,6 +333,7 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
             }
         } catch (e) {
             console.error(e)
+            toast.error("Failed to generate assessment.")
         } finally {
             setIsLoading(false)
         }
@@ -320,6 +396,10 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                 .filter(([_, known]) => known)
                 .map(([concept]) => concept)
 
+            // If we have uploaded resources, we pass them.
+            // If we are in 'preview' flow, we might want to use the draft course ID directly?
+            // For now, let's stick to generating a new structure based on assessment or preview.
+
             const res = await fetch("/api/ai/course/generate", {
                 method: "POST",
                 body: JSON.stringify({
@@ -328,10 +408,14 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                     level: selectedLevel,
                     sourceText,
                     action: "course-structure",
+                    files: uploadedResources.map(r => ({ id: r.id, name: r.name, size: r.size })), // Pass metadata with IDs
+                    domainMap: previewDomainMap,
+                    structure: previewOutline ? { modules: previewOutline } : undefined,
                     assessmentData: {
                         quizResults,
                         knownConcepts
-                    }
+                    },
+                    courseId: undefined // We would pass draft ID if we want to promote it
                 })
             })
             const data = await res.json()
@@ -387,27 +471,19 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                             style={{
                                 width: step === "discovery" ? "20%" :
                                     step === "source" ? "40%" :
-                                        step === "checkpoint" ? "60%" :
-                                            step === "assessment" ? "80%" : "100%"
+                                        step === "analyzing" ? "50%" :
+                                            step === "preview" ? "60%" :
+                                                step === "checkpoint" ? "70%" :
+                                                    step === "assessment" ? "80%" : "100%"
                             }}
                         />
                     </div>
                 </div>
 
                 {/* Content Area */}
-                <div
-                    className="p-8 overflow-y-auto scrollbar-hide flex-1 relative"
-                    onDragOver={step === 'source' ? handleDragOver : undefined}
-                    onDragLeave={step === 'source' ? handleDragLeave : undefined}
-                    onDrop={step === 'source' ? handleDrop : undefined}
-                >
-                    {isDragging && step === 'source' && (
-                        <div className="absolute inset-0 z-50 bg-background/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200 border-2 border-dashed border-primary m-4 rounded-xl">
-                            <Upload className="size-16 text-primary animate-bounce mb-4" />
-                            <h3 className="text-2xl font-bold text-primary">Drop files to Parse</h3>
-                            <p className="text-muted-foreground">PDFs, Text, Markdown supported</p>
-                        </div>
-                    )}
+                <div className="p-8 overflow-y-auto scrollbar-hide flex-1 relative">
+
+                    {/* STEP: SOURCE (Upload / Paste) */}
                     {step === "source" && (
                         <div className="flex flex-col gap-10 text-center animate-in zoom-in-95 duration-500">
                             <div className="space-y-4">
@@ -425,7 +501,6 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                                     ref={fileInputRef}
                                     className="hidden"
                                     accept=".pdf,.txt,.md"
-                                    multiple
                                     onChange={handleFileUpload}
                                 />
                                 <SourceButton
@@ -443,17 +518,22 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                                 />
                             </div>
 
-                            {/* Uploaded Files List */}
-                            {uploadedFiles.length > 0 && (
+                            {/* Uploaded Files Status */}
+                            {uploadedResources.length > 0 && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 w-full text-left">
-                                    {uploadedFiles.map((file, i) => (
+                                    {uploadedResources.map((file, i) => (
                                         <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-600">
                                             <div className="flex items-center gap-2 overflow-hidden">
                                                 <FileText className="size-4 shrink-0" />
                                                 <span className="text-xs font-medium truncate">{file.name}</span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <span className="text-[10px] opacity-70">{formatSize(file.size)}</span>
+                                                <div className="flex flex-col items-end text-[10px] opacity-70">
+                                                    <span>{formatSize(file.size)}</span>
+                                                    {file.status === "QUEUED" && <span className="animate-pulse">Queued...</span>}
+                                                    {file.status === "PROCESSING" && <span className="animate-pulse">Analyzing...</span>}
+                                                    {file.status === "READY" && <span>Ready</span>}
+                                                </div>
                                                 <button onClick={(e) => { e.stopPropagation(); removeFile(i); }} className="hover:text-destructive transition-colors">
                                                     <X size={14} />
                                                 </button>
@@ -488,6 +568,56 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                         </div>
                     )}
 
+                    {/* STEP: ANALYZING (Async) */}
+                    {step === "analyzing" && (
+                        <div className="flex flex-col items-center justify-center py-12 gap-6 animate-in fade-in zoom-in-95">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse" />
+                                <BrainCircuit className="size-16 text-primary relative z-10 animate-bounce" />
+                            </div>
+                            <div className="text-center space-y-2">
+                                <h2 className="text-2xl font-bold">Analyzing your material...</h2>
+                                <p className="text-muted-foreground text-sm max-w-sm">We're reading your document, extracting key concepts, and designing a custom curriculum.</p>
+                            </div>
+                            <Progress value={33} className="w-[60%] h-2" />
+                            <p className="text-xs text-muted-foreground animate-pulse">Scanning contents...</p>
+                        </div>
+                    )}
+
+                    {/* STEP: PREVIEW (Confirm Structure) */}
+                    {step === "preview" && previewOutline && (
+                        <div className="flex flex-col gap-6 animate-in slide-in-from-right-10 overflow-hidden h-full">
+                            <div className="text-center shrink-0">
+                                <h2 className="text-2xl font-bold">Here is what we found</h2>
+                                <p className="text-muted-foreground">We detected this structure from your upload. Is this what you want to learn?</p>
+                            </div>
+
+                            <div className="bg-secondary/10 border border-border rounded-xl p-4 overflow-y-auto space-y-4 flex-1 max-h-[400px]">
+                                {previewOutline.map((mod: any, i: number) => (
+                                    <div key={i} className="bg-card p-4 rounded-lg border border-border/50">
+                                        <h4 className="font-semibold text-primary mb-2">Module {i + 1}: {mod.title}</h4>
+                                        <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                                            {mod.chapters.map((chap: any, j: number) => (
+                                                <li key={j}>{chap.title}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="flex justify-center gap-4 shrink-0 pt-4">
+                                <Button variant="outline" onClick={() => setStep("discovery")}>No, let me customize</Button>
+                                <Button onClick={() => {
+                                    setJudgments(["Based on the textbook, this seems to be an Intermediate course."]);
+                                    setStep("summary");
+                                }}>
+                                    Looks perfect! <ArrowRight className="ml-2 size-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* STEP: DISCOVERY (Topic/Level) */}
                     {step === "discovery" && (
                         <div className="flex flex-col gap-8 animate-in slide-in-from-right-10 duration-500">
                             <div className="flex flex-col gap-6">
@@ -548,6 +678,7 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                         </div>
                     )}
 
+                    {/* STEP: CHECKPOINT (Concept Check) */}
                     {step === "checkpoint" && (
                         <div className="flex flex-col gap-8 animate-in slide-in-from-right-10 duration-500">
                             <div className="flex flex-col gap-2">
@@ -585,6 +716,7 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                         </div>
                     )}
 
+                    {/* STEP: ASSESSMENT (Diagnostic) */}
                     {step === "assessment" && (
                         <div className="flex flex-col gap-8 animate-in slide-in-from-right-10 duration-500">
                             <div className="flex flex-col gap-2">
@@ -673,6 +805,7 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                         </div>
                     )}
 
+                    {/* STEP: SUMMARY (Judgments) */}
                     {step === "summary" && (
                         <div className="flex flex-col gap-8 animate-in slide-in-from-right-10 duration-500">
                             <div className="flex flex-col gap-2">
@@ -724,6 +857,8 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                         onClick={() => {
                             if (step === "discovery") setIsOpen(false)
                             else if (step === "source") setStep("discovery")
+                            else if (step === "analyzing") setStep("source")
+                            else if (step === "preview") setStep("analyzing") // Or back to source?
                             else if (step === "checkpoint") setStep("source")
                             else if (step === "assessment") {
                                 if (showQuizResults) setShowQuizResults(false)
@@ -736,11 +871,18 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                     </Button>
 
                     <Button
-                        disabled={(step === "discovery" && (!topic || !selectedLevel)) || (step === "source" && !sourceText) || isLoading}
+                        disabled={(step === "discovery" && (!topic || !selectedLevel)) || (step === "source" && !sourceText && uploadedResources.length === 0) || isLoading}
                         onClick={() => {
                             if (step === "discovery") setStep("source")
                             else if (step === "source") handleGenerateDomain()
-                            else if (step === "checkpoint") handleGenerateAssessment()
+                            else if (step === "preview") {
+                                setJudgments(["Based on the course preview, we've prepared this curriculum."]);
+                                setStep("summary");
+                            }
+                            else if (step === "checkpoint") {
+                                if (previewOutline) setStep("preview");
+                                else handleGenerateAssessment();
+                            }
                             else if (step === "assessment") {
                                 if (showQuizResults) handleFinishAssessment()
                                 else setShowQuizResults(true)

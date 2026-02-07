@@ -257,6 +257,7 @@ model Resource {
   course   Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
   content  String  @db.Text
   type     String // "pdf", "text", "url"
+  status   String  @default("READY") // "PROCESSING", "READY", "ERROR"
   fileName String?
 
   // External Storage Fields

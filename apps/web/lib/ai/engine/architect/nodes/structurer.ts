@@ -13,6 +13,12 @@ export const structurerNode = async (state: ArchitectState) => {
 
     console.log(`[LANGGRAPH-V2] 🏗️ Structurer Node: Building syllabus for "${topic}"`);
 
+    // SKIP IF ALREADY EXISTS
+    if (state.structure) {
+        console.log(`[LANGGRAPH-V2] 🏗️ Structurer Node: Skipping generation, using provided Structure.`);
+        return { structure: state.structure };
+    }
+
     if (!domainMap) return { error: "Missing Domain Map" };
 
     const prompt = ChatPromptTemplate.fromMessages([

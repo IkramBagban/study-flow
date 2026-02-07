@@ -16,50 +16,62 @@ export async function POST(req: NextRequest) {
 
         console.log(`[Parser] Processing ${files.length} files...`);
 
-        // Use unpdf for server-side PDF parsing (no DOM dependencies)
-        const { extractText } = await import("unpdf");
+        // Use unpdf for server-side PDF parsing
 
-        let combinedContent = "";
+        // Response container
+        const results = [];
 
         for (const file of files) {
-            let fileContent = "";
-            let storageUrl = "";
-            let storageKey = "";
-
             try {
-                // 1. Upload to Storage (Temp/Draft folder)
+                // 1. Upload to Storage (Temp/Draft)
                 const { StorageService } = await import("@/lib/storage/storage-service");
                 const uploadResult = await StorageService.upload(file, `temp/${Date.now()}`);
-                storageUrl = uploadResult.url;
-                storageKey = uploadResult.key;
 
-                // 2. Parse Content
+                let fileText = "";
+                let pageCount = 0;
+                let isTruncated = false;
+
+                // 2. Parse Content (Smart Scan)
                 if (file.type === "application/pdf") {
                     const arrayBuffer = await file.arrayBuffer();
-                    const { text } = await extractText(arrayBuffer, { mergePages: true });
-                    fileContent = `--- FILE: ${file.name} ---\n${text}`;
+
+                    const { extractText } = await import("unpdf");
+                    // extractText returns { text, totalPages }
+                    const result = await extractText(arrayBuffer, { mergePages: true });
+
+                    fileText = result.text;
+                    pageCount = result.totalPages;
+
+                    // Log for debugging
+                    console.log(`[Parser] ${file.name}: Processed ${pageCount} pages.`);
+
                 } else {
-                    // Assume text
-                    const text = await file.text();
-                    fileContent = `--- FILE: ${file.name} ---\n${text}`;
+                    fileText = await file.text();
                 }
 
-                // Cleanup
-                fileContent = fileContent.replace(/\n\s*\n/g, "\n").trim();
-                combinedContent += (combinedContent ? "\n\n" : "") + fileContent;
+                // Cleanup text
+                fileText = fileText.replace(/\n\s*\n/g, "\n").trim();
+
+                results.push({
+                    name: file.name,
+                    size: file.size,
+                    pageCount,
+                    url: uploadResult.url,
+                    key: uploadResult.key,
+                    preview: fileText.slice(0, 1000), // Peek
+                    text: fileText, // Full text for now (until we implement background ingestion)
+                    isTruncated: false // marking false since we read all for now
+                });
 
             } catch (err) {
                 console.error(`Failed to parse file ${file.name}`, err);
-                combinedContent += `\n\n--- ERROR PARSING ${file.name} ---`;
+                results.push({ name: file.name, error: "Failed to parse" });
             }
         }
 
         return NextResponse.json({
-            text: combinedContent,
-            count: files.length,
-            // Note: In a real multi-file scenario, we'd return an array of metadata. 
-            // For now, keeping it simple as the frontend focuses on text.
-            // Future improvement: Return `files: [{name, url, key, text}]`
+            files: results,
+            count: results.length
         });
     } catch (error) {
         console.error("Parse error", error);

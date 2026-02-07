@@ -33,6 +33,8 @@ class CloudinaryStorageProvider implements StorageProvider {
                     resource_type: 'auto', // auto-detect 'pdf', 'image', etc.
                     use_filename: true,
                     unique_filename: true,
+                    type: 'upload', // Ensures it's a standard upload
+                    access_mode: 'public', // Make the file publicly accessible
                 },
                 (error, result) => {
                     if (error) {

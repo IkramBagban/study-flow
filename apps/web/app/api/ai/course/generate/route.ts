@@ -14,6 +14,15 @@ const GenerateSchema = z.object({
     sourceText: z.string().optional(),
     useOnlyResources: z.boolean().optional(),
     // Optional fields
+    files: z.array(z.object({
+        id: z.string().optional(),
+        name: z.string(),
+        size: z.number(),
+        pageCount: z.number().optional(),
+        url: z.string().optional(),
+        key: z.string().optional(),
+        text: z.string().optional() // Partial text if we have it
+    })).optional(),
     concepts: z.array(z.string()).optional(), // For 'assess' phase
     selectedConcepts: z.array(z.string()).optional(), // For 'infer' phase
     quizResults: z.array(z.any()).optional(), // For 'infer' phase
@@ -23,7 +32,9 @@ const GenerateSchema = z.object({
             correct: z.boolean()
         })),
         knownConcepts: z.array(z.string())
-    }).optional() // For 'course-structure' phase
+    }).optional(), // For 'course-structure' phase
+    domainMap: z.any().optional(),
+    structure: z.any().optional()
 });
 
 export const maxDuration = 60; // Allow longer interaction for AI generation
@@ -31,7 +42,7 @@ export const maxDuration = 60; // Allow longer interaction for AI generation
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { topic, goal, level, action, concepts, selectedConcepts, quizResults, assessmentData, sourceText, useOnlyResources } = GenerateSchema.parse(body);
+        const { topic, goal, level, action, concepts, selectedConcepts, quizResults, assessmentData, sourceText, useOnlyResources, files, domainMap, structure } = GenerateSchema.parse(body);
 
         if (action === "domain-map") {
             const domainMap = await CourseService.generateDomainMap(topic, goal, sourceText, useOnlyResources);
@@ -65,7 +76,10 @@ export async function POST(req: NextRequest) {
                 level,
                 sourceText,
                 assessmentData,
-                useOnlyResources
+                useOnlyResources,
+                files,
+                domainMap,
+                structure
             );
             return NextResponse.json({ courseId: course.id });
         }

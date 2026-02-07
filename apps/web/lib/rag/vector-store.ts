@@ -10,6 +10,10 @@ import { splitText } from "./text-splitter";
  * 3. Generates embeddings.
  * 4. Stores vectors in the database.
  */
+/**
+ * Ingests a text resource into the RAG system.
+ * Legacy Wrapper: Creates resource and keys it immediately.
+ */
 export async function ingestResource(
     courseId: string,
     content: string,
@@ -26,18 +30,30 @@ export async function ingestResource(
             fileName,
             url: storage?.url,
             fileKey: storage?.key,
-            metadata: storage?.metadata ?? undefined
+            metadata: storage?.metadata ?? undefined,
+            status: "READY" // Synchronous ingestion implies ready
         }
     });
 
-    // 2. Split Text
-    console.log(`[RAG]  Splitting content of length ${content.length}`);
+    // 2. Generate Embeddings
+    await generateEmbeddingsForResource(resource.id, content);
+
+    return resource;
+}
+
+/**
+ * Generates embeddings for an existing Resource record.
+ * This is the heavy lifting function used by Background Workers.
+ */
+export async function generateEmbeddingsForResource(resourceId: string, content: string) {
+    // 1. Split Text
+    console.log(`[RAG] 🧠 Splitting content of length ${content.length} for Resource ${resourceId}`);
     const chunks = splitText(content);
     console.log(`[RAG]  Split into ${chunks.length} chunks`);
 
-    if (chunks.length === 0) return resource;
+    if (chunks.length === 0) return;
 
-    // 3. Generate Embeddings in Batches
+    // 2. Generate Embeddings in Batches
     const batchSize = 10;
 
     for (let i = 0; i < chunks.length; i += batchSize) {
@@ -45,7 +61,7 @@ export async function ingestResource(
         try {
             const vectors = await getBatchEmbeddings(batchChunks);
 
-            // 4. Store Embeddings
+            // 3. Store Embeddings
             for (let j = 0; j < batchChunks.length; j++) {
                 const chunkText = batchChunks[j];
                 const vector = vectors[j];
@@ -55,16 +71,15 @@ export async function ingestResource(
                     const vectorString = `[${vector.join(",")}]`;
                     await prisma.$executeRaw`
                       INSERT INTO "embedding" ("id", "resourceId", "content", "vector")
-                      VALUES (gen_random_uuid(), ${resource.id}, ${chunkText}, ${vectorString}::vector)
+                      VALUES (gen_random_uuid(), ${resourceId}, ${chunkText}, ${vectorString}::vector)
                   `;
                 }
             }
         } catch (error) {
             console.error("[RAG] Error generating/storing embeddings for batch", error);
+            throw error; // Throw to let Inngest retry
         }
     }
-
-    return resource;
 }
 
 /**
