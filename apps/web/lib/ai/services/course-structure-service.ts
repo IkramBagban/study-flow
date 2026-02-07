@@ -171,31 +171,99 @@ export class CourseStructureService {
         domainMap?: any;
         structure?: any;
     }) {
-        console.log(`[CourseArchitect] 🎓 Creating course: "${input.topic}"`);
+        console.log(`[CourseArchitect] 🎓 Creating course: "${input.topic}" (Checking Async/Sync Path)`);
 
-        // Dynamic import to avoid circular dep issues during init
-        const { courseArchitectGraph } = await import("../engine/architect/graph");
+        // --- 1. SYNC PATH (Fast / PDF / Provided Structure) ---
+        if (input.structure) {
+            console.log(`[CourseArchitect] 🚀 Fast Path (Structure Provided)`);
+            const { courseArchitectGraph } = await import("../engine/architect/graph");
 
-        // Invoke the Graph
-        const result = await courseArchitectGraph.invoke({
-            topic: input.topic,
-            goal: input.goal,
-            level: input.level,
-            sourceText: input.sourceText,
-            useOnlyResources: input.useOnlyResources,
-            domainMap: input.domainMap || null,
-            structure: input.structure || null,
-            error: null
-        });
+            // Invoke the Graph (it will skip generation if structure provided)
+            const result = await courseArchitectGraph.invoke({
+                topic: input.topic,
+                goal: input.goal,
+                level: input.level,
+                sourceText: input.sourceText,
+                useOnlyResources: input.useOnlyResources,
+                domainMap: input.domainMap || null,
+                structure: input.structure || null,
+                error: null
+            });
 
-        if (result.error || !result.domainMap || !result.structure) {
-            throw new Error(result.error || "Failed to generate course structure");
+            if (result.error || !result.domainMap || !result.structure) {
+                throw new Error(result.error || "Failed to generate course structure");
+            }
+
+            const domainMap = result.domainMap;
+            const structure = result.structure;
+
+            // Save to database
+            const course = await prisma.course.create({
+                data: {
+                    title: input.topic,
+                    subject: input.topic,
+                    description: input.goal,
+                    goal: input.goal,
+                    userId: input.userId,
+                    level: input.level,
+                    status: "READY",
+                    assessmentData: input.assessmentData ?? undefined,
+                    sourceData: {
+                        domainMap: domainMap,
+                        keyConcepts: domainMap.keyConcepts,
+                        sourceText: input.sourceText
+                    },
+                    modules: {
+                        create: structure.modules.map((module: any) => ({
+                            title: module.title,
+                            description: module.description,
+                            order: module.order,
+                            chapters: {
+                                create: module.chapters.map((chapter: any) => ({
+                                    title: chapter.title,
+                                    order: chapter.order,
+                                    concepts: {
+                                        create: chapter.concepts.map((concept: any) => ({
+                                            title: concept.title,
+                                            type: concept.type,
+                                            order: concept.order,
+                                            isReady: false,
+                                            content: {
+                                                description: concept.description
+                                            }
+                                        }))
+                                    }
+                                }))
+                            }
+                        }))
+                    }
+                },
+                include: { modules: { include: { chapters: { include: { concepts: true } } } } }
+            });
+
+            console.log(`[CourseArchitect] ✅ Course Created (Sync): ${course.id}`);
+
+            // Link Files
+            if (input.files && input.files.length > 0) {
+                await linkFiles(course.id, input.files);
+            }
+
+            // Ingest Source Text (Sync for now)
+            if (input.sourceText && (!input.files || input.files.length === 0)) {
+                try {
+                    await ingestResource(course.id, input.sourceText, 'text', 'Source Text');
+                } catch (e) {
+                    console.error("Failed to ingest source text in sync mode", e);
+                }
+            }
+
+            return course;
         }
 
-        const domainMap = result.domainMap;
-        const structure = result.structure;
+        // --- 2. ASYNC PATH (Background Generation / Legacy Flow) ---
+        console.log(`[CourseArchitect] ⏳ Async Path (Queueing Generation Job)`);
 
-        // Save to database
+        // Create Shell
         const course = await prisma.course.create({
             data: {
                 title: input.topic,
@@ -204,101 +272,93 @@ export class CourseStructureService {
                 goal: input.goal,
                 userId: input.userId,
                 level: input.level,
-                assessmentData: input.assessmentData ?? undefined,
+                status: "GENERATING", // STATUS
+                modules: { create: [] },
                 sourceData: {
-                    domainMap: domainMap,
-                    keyConcepts: domainMap.keyConcepts,
                     sourceText: input.sourceText
-                },
-                modules: {
-                    create: structure.modules.map((module: any) => ({
-                        title: module.title,
-                        description: module.description,
-                        order: module.order,
-                        chapters: {
-                            create: module.chapters.map((chapter: any) => ({
-                                title: chapter.title,
-                                order: chapter.order,
-                                concepts: {
-                                    create: chapter.concepts.map((concept: any) => ({
-                                        title: concept.title,
-                                        type: concept.type,
-                                        order: concept.order,
-                                        isReady: false,
-                                        content: {
-                                            description: concept.description
-                                        }
-                                    }))
-                                }
-                            }))
-                        }
-                    }))
                 }
-            },
-            include: { modules: { include: { chapters: { include: { concepts: true } } } } }
+            }
         });
 
-        console.log(`[CourseArchitect] ✅ Course Created: ${course.id}`);
-
+        // Link Files (Sync)
         if (input.files && input.files.length > 0) {
-            console.log(`[CourseArchitect] 📥 Processing ${input.files.length} Files`);
-
-            // Link uploaded files to the course
-            for (const file of input.files) {
-                try {
-                    if (file.id) {
-                        // Link Existing Resource (uploaded earlier in flow)
-                        await prisma.resource.update({
-                            where: { id: file.id },
-                            data: { courseId: course.id }
-                        });
-                        console.log(`[CourseArchitect] 🔗 Linked existing resource ${file.id} to new course ${course.id}`);
-                    } else {
-                        // Create Resource Record (New)
-                        const resource = await prisma.resource.create({
-                            data: {
-                                courseId: course.id,
-                                fileName: file.name, // Correct field name
-                                type: file.url?.includes('.pdf') ? 'pdf' : 'text',
-                                url: file.url || "",
-                                fileKey: file.key || "", // Correct field name
-                                status: "PROCESSING",
-                                content: file.text ? file.text.substring(0, 100) + "..." : "", // Store snippet or full content if needed
-                                metadata: {
-                                    size: file.size,
-                                    pageCount: file.pageCount
-                                }
-                            }
-                        });
-
-                        // Trigger Background Ingestion (via Redis Queue)
-                        if (file.text) {
-                            const { ingestionQueue } = await import("@/lib/queue/client");
-                            await ingestionQueue.add('ingest', {
-                                resourceId: resource.id,
-                                content: file.text,
-                                courseId: course.id
-                            });
-                            console.log(`[CourseArchitect] 🚀 Queued ingestion for ${file.name} (Job ID: ${resource.id})`);
-                        }
-                    }
-                } catch (e) {
-                    console.error(`[CourseArchitect] Failed to link file ${file.name}`, e);
-                }
-            }
+            await linkFiles(course.id, input.files);
         }
 
-        // Legacy single text ingestion (keep for backward compat or direct paste)
+        // Queue Job
+        const { ingestionQueue } = await import("@/lib/queue/client");
+        await ingestionQueue.add('generate-course', {
+            courseId: course.id,
+            ...input
+        });
+
+        // Trigger Async Ingestion (Optional)
         if (input.sourceText && (!input.files || input.files.length === 0)) {
-            console.log(`[CourseArchitect] 📥 Ingesting Source Text (${input.sourceText.length} chars)`);
-            try {
-                await ingestResource(course.id, input.sourceText, 'text', 'Initial Logic Source');
-                console.log(`[CourseArchitect]  Source Text Ingested & Embedded`);
-            } catch (e) {
-                console.error(`[CourseArchitect]  Failed to ingest source text`, e);
-            }
+            // We create a resource record and queue it
+            const resource = await prisma.resource.create({
+                data: {
+                    courseId: course.id,
+                    fileName: "Source Text",
+                    type: "text",
+                    status: "PROCESSING",
+                    content: input.sourceText,
+                    metadata: { size: input.sourceText.length }
+                }
+            });
+            await ingestionQueue.add('ingest', {
+                resourceId: resource.id,
+                content: input.sourceText,
+                courseId: course.id
+            });
         }
 
         return course;
+    }
+}
+
+// Helper function outside class
+async function linkFiles(courseId: string, files: any[]) {
+    console.log(`[CourseArchitect] 📥 Processing ${files.length} Files`);
+    for (const file of files) {
+        try {
+            if (file.id) {
+                // Link Existing Resource (uploaded earlier in flow)
+                await prisma.resource.update({
+                    where: { id: file.id },
+                    data: { courseId: courseId }
+                });
+                console.log(`[CourseArchitect] 🔗 Linked existing resource ${file.id} to new course ${courseId}`);
+            } else {
+                // Create Resource Record (New)
+                const resource = await prisma.resource.create({
+                    data: {
+                        courseId: courseId,
+                        fileName: file.name,
+                        type: file.url?.includes('.pdf') ? 'pdf' : 'text',
+                        url: file.url || "",
+                        fileKey: file.key || "",
+                        status: "PROCESSING",
+                        content: file.text ? file.text.substring(0, 100) + "..." : "",
+                        metadata: {
+                            size: file.size,
+                            pageCount: file.pageCount
+                        }
+                    }
+                });
+
+                // Trigger Background Ingestion (via Redis Queue)
+                if (file.text) {
+                    const { ingestionQueue } = await import("@/lib/queue/client");
+                    await ingestionQueue.add('ingest', {
+                        resourceId: resource.id,
+                        content: file.text,
+                        courseId: courseId
+                    });
+                    console.log(`[CourseArchitect] 🚀 Queued ingestion for ${file.name} (Job ID: ${resource.id})`);
+                }
+            }
+        } catch (e) {
+            console.error(`[CourseArchitect] Failed to link file ${file.name}`, e);
+        }
     }
 }

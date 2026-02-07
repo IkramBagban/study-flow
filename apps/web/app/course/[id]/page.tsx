@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { RegenerateButton } from "@/components/regenerate-button";
 import { ScrollText, PlayCircle } from "lucide-react";
+import { CourseGenerationLoader } from "@/components/course-generation-loader";
 
 export default async function CoursePage(props: { params: Promise<{ id: string }> }) {
     const params = await props.params;
@@ -24,6 +25,10 @@ export default async function CoursePage(props: { params: Promise<{ id: string }
 
     if (!course) {
         notFound();
+    }
+
+    if (course.status === "GENERATING") {
+        return <CourseGenerationLoader courseId={course.id} />;
     }
 
     return (

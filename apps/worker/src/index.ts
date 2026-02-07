@@ -23,6 +23,10 @@ const embeddings = new GoogleGenerativeAIEmbeddings({
 });
 
 const worker = new Worker('ingestion-queue', async (job: Job) => {
+    if (job.name === 'generate-course') {
+        return handleGenerateCourse(job);
+    }
+
     let resourceId = job.data.resourceId;
 
     try {
@@ -36,54 +40,65 @@ const worker = new Worker('ingestion-queue', async (job: Job) => {
             data: { status: "PROCESSING" }
         });
 
-        // 2. Download File
-        console.log(`[Job ${job.id}] Downloading file from: ${fileUrl}`);
-        const response = await fetch(fileUrl);
-        if (!response.ok) {
-            throw new Error(`Failed to download file: ${response.statusText}. Ensure PDF delivery is enabled in Cloudinary.`);
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        console.log(`[Job ${job.id}] Downloaded ${arrayBuffer.byteLength} bytes`);
-
+        // 2. Check for provided content or download
         let content = "";
 
-        // 3. Parse Content
-        if (fileType === "application/pdf" || fileType === "pdf") {
-            try {
-                console.log(`[Job ${job.id}] Parsing PDF...`);
-
-                // Convert Buffer to Uint8Array by creating a CLEAN copy
-                const buffer = Buffer.from(arrayBuffer);
-                const uint8Array = new Uint8Array(buffer);
-                const cleanData = Uint8Array.from(uint8Array);
-
-                const pdfData = await extractText(cleanData);
-
-                console.log(`[Job ${job.id}] PDF Parsed. Pages: ${pdfData.totalPages}`);
-
-                // Handle text array or string
-                content = Array.isArray(pdfData.text) ? pdfData.text.join("\n") : pdfData.text;
-
-                // Update metadata with page count
-                const pageCount = pdfData.totalPages;
-                await prisma.resource.update({
-                    where: { id: resourceId },
-                    data: { metadata: { pageCount, originalUrl: fileUrl } }
-                });
-            } catch (parseError: any) {
-                console.error(`[Job ${job.id}] PDF PARSE ERROR: ${parseError.message}`);
-                throw new Error(`PDF Parsing Failed: ${parseError.message}`);
-            }
+        if (job.data.content) {
+            console.log(`[Job ${job.id}] Using provided content (${job.data.content.length} chars)`);
+            content = job.data.content;
         } else {
-            console.log(`[Job ${job.id}] Parsing Text...`);
-            content = Buffer.from(arrayBuffer).toString('utf-8');
+            console.log(`[Job ${job.id}] Downloading file from: ${fileUrl}`);
+            const response = await fetch(fileUrl);
+            if (!response.ok) {
+                throw new Error(`Failed to download file: ${response.statusText}. Ensure PDF delivery is enabled in Cloudinary.`);
+            }
+            const arrayBuffer = await response.arrayBuffer();
+            console.log(`[Job ${job.id}] Downloaded ${arrayBuffer.byteLength} bytes`);
+
+            // 3. Parse Content
+            if (fileType === "application/pdf" || fileType === "pdf") {
+                try {
+                    console.log(`[Job ${job.id}] Parsing PDF...`);
+
+                    // Convert Buffer to Uint8Array by creating a CLEAN copy
+                    const buffer = Buffer.from(arrayBuffer);
+                    const uint8Array = new Uint8Array(buffer);
+                    const cleanData = Uint8Array.from(uint8Array);
+
+                    const pdfData = await extractText(cleanData);
+
+                    console.log(`[Job ${job.id}] PDF Parsed. Pages: ${pdfData.totalPages}`);
+
+                    // Handle text array or string
+                    content = Array.isArray(pdfData.text) ? pdfData.text.join("\n") : pdfData.text;
+
+                    // Update metadata with page count
+                    const pageCount = pdfData.totalPages;
+                    await prisma.resource.update({
+                        where: { id: resourceId },
+                        data: { metadata: { pageCount, originalUrl: fileUrl } }
+                    });
+                } catch (parseError: any) {
+                    console.error(`[Job ${job.id}] PDF PARSE ERROR: ${parseError.message}`);
+                    throw new Error(`PDF Parsing Failed: ${parseError.message}`);
+                }
+            } else {
+                console.log(`[Job ${job.id}] Parsing Text...`);
+                content = Buffer.from(arrayBuffer).toString('utf-8');
+            }
         }
 
         // Clean content
         content = content.replace(/\n\s*\n/g, "\n").trim();
 
-        if (!content || content.length < 50) {
-            throw new Error("Content too short or empty after parsing");
+        if (!content || content.trim().length === 0) {
+            throw new Error("Content is empty after parsing");
+        }
+
+        if (content.length < 20) {
+            console.warn(`[Job ${job.id}] Content too short for meaningful analysis (${content.length} chars). Marking as READY but skipping deep processing.`);
+            await prisma.resource.update({ where: { id: resourceId }, data: { status: "READY" } });
+            return;
         }
 
         console.log(`[Job ${job.id}] Content length: ${content.length}`);
@@ -177,22 +192,34 @@ const worker = new Worker('ingestion-queue', async (job: Job) => {
 
         // Update DB with Error
         try {
-            const currentResource = await prisma.resource.findUnique({ where: { id: resourceId } });
-            const currentMeta = (currentResource?.metadata as object) || {};
+            if (job.name === 'generate-course') {
+                // Handle Course Generation Error
+                await prisma.course.update({
+                    where: { id: job.data.courseId },
+                    data: { status: "ERROR" }
+                });
+            } else {
+                // Handle Ingestion Error (Resource)
+                const resourceId = job.data.resourceId;
+                if (resourceId) {
+                    const currentResource = await prisma.resource.findUnique({ where: { id: resourceId } });
+                    const currentMeta = (currentResource?.metadata as object) || {};
 
-            await prisma.resource.update({
-                where: { id: resourceId },
-                data: {
-                    status: "ERROR",
-                    metadata: {
-                        ...currentMeta,
-                        error: error.message,
-                        failedAt: new Date().toISOString()
-                    }
+                    await prisma.resource.update({
+                        where: { id: resourceId },
+                        data: {
+                            status: "ERROR",
+                            metadata: {
+                                ...currentMeta,
+                                error: error.message,
+                                failedAt: new Date().toISOString()
+                            }
+                        }
+                    });
                 }
-            });
+            }
         } catch (dbError) {
-            console.error("Failed to update resource status to ERROR in DB", dbError);
+            console.error("Failed to update status to ERROR in DB", dbError);
         }
 
         throw error;
@@ -238,4 +265,83 @@ function splitText(text: string, chunkSize = 1000, chunkOverlap = 200): string[]
         if (start < 0) start = 0;
     }
     return chunks;
+}
+
+async function handleGenerateCourse(job: Job) {
+    console.log(`[Job ${job.id}] Generating Course: ${job.data.topic || job.data.courseId}`);
+    const { courseId, topic, goal, level, sourceText, useOnlyResources, domainMap, structure } = job.data;
+
+    try {
+        // Set Status to GENERATING (if not already)
+        await prisma.course.update({ where: { id: courseId }, data: { status: "GENERATING" } });
+
+        // Dynamic import
+        const { courseArchitectGraph } = await import('../../web/lib/ai/engine/architect/graph');
+
+        const result = await courseArchitectGraph.invoke({
+            topic, goal, level, sourceText, useOnlyResources,
+            domainMap: domainMap || null,
+            structure: structure || null,
+            error: null
+        });
+
+        if (result.error || !result.structure) throw new Error(result.error || "No structure generated");
+
+        const generatedStructure = result.structure;
+
+        // 1. Update Course Metadata first
+        await prisma.course.update({
+            where: { id: courseId },
+            data: {
+                sourceData: {
+                    domainMap: result.domainMap,
+                    keyConcepts: result.domainMap?.keyConcepts,
+                    sourceText: sourceText
+                }
+            }
+        });
+
+        // 2. Save Modules Sequentially (Enables Progressive Loading)
+        console.log(`[Job ${job.id}] Saving ${generatedStructure.modules.length} modules sequentially...`);
+
+        for (const module of generatedStructure.modules) {
+            await prisma.module.create({
+                data: {
+                    courseId: courseId,
+                    title: module.title,
+                    description: module.description,
+                    order: module.order,
+                    chapters: {
+                        create: module.chapters.map((chapter: any) => ({
+                            title: chapter.title,
+                            order: chapter.order,
+                            concepts: {
+                                create: chapter.concepts.map((concept: any) => ({
+                                    title: concept.title,
+                                    type: concept.type,
+                                    order: concept.order,
+                                    isReady: false,
+                                    content: { description: concept.description }
+                                }))
+                            }
+                        }))
+                    }
+                }
+            });
+            // Small artificial delay to ensure frontend catches updates (optional)
+            await new Promise(r => setTimeout(r, 200));
+        }
+
+        // 3. Mark as READY
+        await prisma.course.update({
+            where: { id: courseId },
+            data: { status: "READY" }
+        });
+
+        console.log(`[Job ${job.id}] Course ${courseId} Generated Successfully!`);
+    } catch (e: any) {
+        console.error(`[Job ${job.id}] Generation Failed`, e);
+        // await prisma.course.update({ where: { id: courseId }, data: { status: "ERROR" } }); 
+        throw e;
+    }
 }
