@@ -10,26 +10,25 @@ import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
 interface QuizViewProps {
-    quiz: any; // Type strictly if possible
+    quiz: any;
     userId: string;
-    searchParams?: any;
 }
 
-export function QuizView({ quiz, userId, searchParams }: QuizViewProps) {
+export function QuizView({ quiz, userId }: QuizViewProps) {
     const router = useRouter();
     const pathname = usePathname();
+    const searchParams = useSearchParams();
 
     const [started, setStarted] = useState(false);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [answers, setAnswers] = useState<Record<string, string>>({}); // questionId -> optionId
+    const [answers, setAnswers] = useState<Record<string, string>>({});
     const [submitted, setSubmitted] = useState(false);
     const [result, setResult] = useState<any>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Initialize state based on URL params
     useEffect(() => {
-        const mode = searchParams?.mode;
-        const attemptId = searchParams?.attemptId;
+        const mode = searchParams.get('mode');
+        const attemptId = searchParams.get('attemptId');
 
         if (mode === 'attempt') {
             setStarted(true);
@@ -43,7 +42,6 @@ export function QuizView({ quiz, userId, searchParams }: QuizViewProps) {
                 loadAttempt(attempt);
             }
         } else {
-            // Default: Entry Screen
             setStarted(false);
             setSubmitted(false);
             setResult(null);
@@ -51,7 +49,6 @@ export function QuizView({ quiz, userId, searchParams }: QuizViewProps) {
     }, [searchParams, quiz.attempts]);
 
     const loadAttempt = (attempt: any) => {
-        // Reconstruct result object from attempt data
         const restoredResult = {
             ...attempt,
             percentage: attempt.score,
@@ -74,7 +71,6 @@ export function QuizView({ quiz, userId, searchParams }: QuizViewProps) {
         setStarted(true);
     };
 
-    // If there are no questions, show empty state
     if (!quiz.questions || quiz.questions.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4">
@@ -90,12 +86,10 @@ export function QuizView({ quiz, userId, searchParams }: QuizViewProps) {
     const totalQuestions = quiz.questions.length;
 
     const handleStart = () => {
-        // Update URL to active mode
         router.push(`${pathname}?mode=attempt`);
     };
 
     const handleViewAttempt = (attempt: any) => {
-        // Update URL to specific attempt
         router.push(`${pathname}?attemptId=${attempt.id}`);
     };
 
@@ -124,12 +118,6 @@ export function QuizView({ quiz, userId, searchParams }: QuizViewProps) {
             }));
 
             const response = await submitQuizAttempt(quiz.id, formattedAnswers);
-
-            // After submit, we just show the result. 
-            // Optional: We could redirect to ?attemptId=new_id to make it shareable immediately
-            // But for smoother UX, we just show it. 
-            // If they refresh, they go to main menu unless we change URL.
-            // Let's replace URL with the new attempt URL so refresh works.
             router.replace(`${pathname}?attemptId=${response.id}`);
 
             setResult(response);
@@ -150,283 +138,197 @@ export function QuizView({ quiz, userId, searchParams }: QuizViewProps) {
         }
     };
 
+    const BackgroundGlow = () => (
+        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+            <div className="absolute top-[-20%] left-[10%] w-[600px] h-[600px] bg-indigo-500/5 blur-[120px] rounded-full mix-blend-screen animate-pulse duration-[8s]" />
+            <div className="absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] bg-purple-500/5 blur-[100px] rounded-full mix-blend-screen" />
+        </div>
+    );
+
     if (!started && !submitted) {
         return (
-            <div className="flex flex-col items-center min-h-[60vh] text-center space-y-12 animate-in fade-in slide-in-from-bottom-5 max-w-4xl mx-auto">
-                {/* Hero Section */}
-                <div className="space-y-6 flex flex-col items-center">
-                    <div className="size-24 bg-primary/10 rounded-full flex items-center justify-center text-primary shadow-lg shadow-primary/20 ring-4 ring-primary/5">
-                        <BrainCircuit size={48} />
-                    </div>
-                    <div className="space-y-4 max-w-lg">
-                        <h1 className="text-4xl font-bold tracking-tight">{quiz.title}</h1>
-                        <p className="text-lg text-muted-foreground leading-relaxed">
-                            {quiz.questions.length} questions to text your knowledge.
+            <div className="relative min-h-[70vh] flex flex-col items-center justify-center p-6 text-center">
+                <BackgroundGlow />
+
+                <div className="relative z-10 w-full max-w-2xl mx-auto space-y-10 animate-in fade-in zoom-in-95 duration-700">
+                    <div className="space-y-6">
+                        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-foreground leading-tight">
+                            {quiz.title}
+                        </h1>
+                        <p className="text-lg text-muted-foreground leading-relaxed max-w-lg mx-auto">
+                            Ready to challenge yourself? You have {quiz.questions.length} questions waiting.
                         </p>
                     </div>
-                    <Button size="lg" onClick={handleStart} className="rounded-full px-12 py-7 text-lg shadow-xl shadow-primary/20 hover:scale-105 transition-all font-semibold">
-                        Start New Attempt <PlayCircle className="ml-2 size-5" />
-                    </Button>
-                </div>
 
-                {/* History Section */}
-                {quiz.attempts && quiz.attempts.length > 0 && (
-                    <div className="w-full max-w-2xl space-y-6 pt-8 border-t border-border/50">
-                        <div className="flex items-center justify-between px-2">
-                            <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                                <span className="size-2 rounded-full bg-primary" />
-                                Recent Attempts
-                            </h3>
-                            <span className="text-sm text-muted-foreground">{quiz.attempts.length} attempts</span>
-                        </div>
-
-                        <div className="grid gap-3">
-                            {quiz.attempts.map((attempt: any) => (
-                                <button
-                                    key={attempt.id}
-                                    onClick={() => handleViewAttempt(attempt)}
-                                    className="group flex items-center justify-between p-4 rounded-2xl bg-card border border-border/50 hover:border-primary/50 hover:shadow-md transition-all text-left"
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className={cn(
-                                            "flex flex-col items-center justify-center size-12 rounded-xl text-xs font-bold leading-none",
-                                            attempt.score >= 80 ? "bg-green-500/10 text-green-700" :
-                                                attempt.score >= 60 ? "bg-blue-500/10 text-blue-700" :
-                                                    "bg-orange-500/10 text-orange-700"
-                                        )}>
-                                            <span>{Math.round(attempt.score)}%</span>
-                                        </div>
-                                        <div>
-                                            <div className="font-medium text-foreground">
-                                                {new Date(attempt.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">
-                                                {new Date(attempt.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-primary opacity-0 group-hover:opacity-100 transition-opacity text-sm font-medium">
-                                        View Details <ArrowRight size={16} />
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
+                    <div className="flex flex-col items-center gap-4">
+                        <Button size="lg" onClick={handleStart} className="rounded-full px-10 py-6 text-lg shadow-lg hover:shadow-primary/20 hover:scale-105 transition-all font-semibold group">
+                            Start Assessment
+                            <ArrowRight className="ml-2 size-5 group-hover:translate-x-1 transition-transform" />
+                        </Button>
                     </div>
-                )}
+
+                    {quiz.attempts && quiz.attempts.length > 0 && (
+                        <div className="pt-8 border-t border-border/50 w-full max-w-md mx-auto">
+                            <div className="text-sm font-medium text-muted-foreground mb-4">Recent Activity</div>
+                            <div className="space-y-3">
+                                {quiz.attempts.slice(0, 3).map((attempt: any) => (
+                                    <div key={attempt.id} className="flex items-center justify-between text-sm p-4 rounded-xl bg-card/50 border border-border/50 hover:bg-card transition-colors text-left">
+                                        <div className="flex flex-col">
+                                            <span className="font-medium">{new Date(attempt.createdAt).toLocaleDateString()}</span>
+                                            <span className="text-xs text-muted-foreground">{new Date(attempt.createdAt).toLocaleTimeString()}</span>
+                                        </div>
+                                        <span className={cn(
+                                            "font-bold text-lg",
+                                            attempt.score >= 70 ? "text-green-500" : "text-orange-500"
+                                        )}>{Math.round(attempt.score)}%</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         )
     }
 
     if (submitted && result) {
         return (
-            <div className="max-w-3xl mx-auto space-y-8 animate-in zoom-in-95 duration-500 pb-20">
-                <div className="text-center space-y-8 py-8">
-                    {/* Performance Badge */}
-                    <div className={cn(
-                        "inline-flex items-center justify-center px-6 py-2 rounded-full text-base font-semibold shadow-sm",
-                        result.performanceLevel === "Excellent" ? "bg-green-500/10 text-green-700 ring-1 ring-green-500/20" :
-                            result.performanceLevel === "Good" ? "bg-blue-500/10 text-blue-700 ring-1 ring-blue-500/20" :
-                                "bg-orange-500/10 text-orange-700 ring-1 ring-orange-500/20"
-                    )}>
-                        {result.performanceLevel || "Quiz Complete"}
-                    </div>
+            <div className="relative min-h-[80vh] py-12 px-6">
+                <BackgroundGlow />
+                <div className="relative z-10 max-w-4xl mx-auto space-y-8 animate-in zoom-in-95 duration-500 pb-20">
+                    <div className="text-center space-y-8 py-8">
+                        <div className={cn(
+                            "inline-flex items-center justify-center px-6 py-2 rounded-full text-base font-semibold shadow-sm backdrop-blur-md bg-background/50",
+                            result.performanceLevel === "Excellent" ? "bg-green-500/10 text-green-700 ring-1 ring-green-500/20" :
+                                result.performanceLevel === "Good" ? "bg-blue-500/10 text-blue-700 ring-1 ring-blue-500/20" :
+                                    "bg-orange-500/10 text-orange-700 ring-1 ring-orange-500/20"
+                        )}>
+                            {result.performanceLevel || "Quiz Complete"}
+                        </div>
 
-                    {/* Main Score & Stats */}
-                    <div className="grid grid-cols-3 gap-8 max-w-xl mx-auto items-center">
-                        <div className="text-right space-y-1">
-                            <div className="text-3xl font-bold text-foreground">
-                                {result.correctCount ?? Math.round((result.percentage / 100) * quiz.questions.length)}
-                                <span className="text-muted-foreground/50 text-xl font-medium mx-1">/</span>
-                                {quiz.questions.length}
+                        <div className="space-y-4">
+                            <div className="relative inline-flex flex-col items-center justify-center">
+                                <span className="text-8xl font-black text-foreground tracking-tighter drop-shadow-sm">
+                                    {Math.round(result.percentage || result.score)}<span className="text-4xl text-muted-foreground align-top ml-1">%</span>
+                                </span>
                             </div>
-                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Correct</div>
-                        </div>
 
-                        <div className="relative flex justify-center">
-                            <div className="size-32 rounded-full border-8 border-primary/10 flex items-center justify-center relative">
-                                <span className="text-4xl font-black text-primary tracking-tight">{result.percentage || Math.round(result.score)}%</span>
-                                <svg className="absolute inset-0 -rotate-90 text-primary" viewBox="0 0 100 100">
-                                    <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray="289" strokeDashoffset={289 - (289 * (result.percentage || 0) / 100)} className="transition-all duration-1000 ease-out" />
-                                </svg>
-                            </div>
-                        </div>
-
-                        <div className="text-left space-y-1">
-                            <div className="text-3xl font-bold text-foreground">{quiz.questions.length}</div>
-                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Questions</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-2">
-                    {/* Performance Insight - Enhanced Design */}
-                    <div className="md:col-span-2 p-8 rounded-3xl bg-gradient-to-br from-card to-secondary/30 border border-border/50 shadow-sm relative overflow-hidden group">
-                        <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-primary to-primary/30" />
-                        <div className="absolute -right-20 -top-20 size-64 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors duration-500" />
-
-                        <div className="relative z-10 space-y-4">
-                            <h3 className="font-semibold text-xl flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-background shadow-sm border border-border/50">
-                                    <Target className="size-5 text-primary" />
+                            <div className="flex items-center justify-center gap-8 text-sm text-muted-foreground">
+                                <div className="flex flex-col items-center">
+                                    <span className="text-2xl font-bold text-foreground">{result.correctCount ?? Math.round((result.percentage / 100) * quiz.questions.length)}</span>
+                                    <span>Correct</span>
                                 </div>
-                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
-                                    AI Tutor Feedback
-                                </span>
-                            </h3>
-                            <p className="text-muted-foreground leading-relaxed text-lg font-medium">
-                                "{result.feedback}"
-                            </p>
+                                <div className="w-px h-8 bg-border" />
+                                <div className="flex flex-col items-center">
+                                    <span className="text-2xl font-bold text-foreground">{quiz.questions.length}</span>
+                                    <span>Questions</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Growth Areas */}
-                    {result.growthAreas && result.growthAreas.length > 0 && (
-                        <div className="p-8 rounded-3xl bg-card border border-border/50 shadow-sm space-y-6">
-                            <h4 className="font-semibold text-xl flex items-center gap-3">
-                                <span className="p-2 rounded-lg bg-green-500/10 text-green-600">
-                                    <CheckCircle2 className="size-5" />
-                                </span>
-                                Growth Areas
-                            </h4>
-                            <ul className="space-y-4">
-                                {result.growthAreas.map((area: string, i: number) => (
-                                    <li key={i} className="text-muted-foreground flex items-start gap-3 text-base leading-relaxed">
-                                        <span className="mt-2 size-2 rounded-full bg-green-500/50 flex-shrink-0" />
-                                        <span>{area}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
+                    <div className="grid gap-6 md:grid-cols-2">
+                        <div className="md:col-span-2 p-8 rounded-[2rem] bg-card/60 backdrop-blur-xl border border-white/10 shadow-lg relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-primary to-transparent" />
+                            <div className="relative z-10 space-y-4">
+                                <h3 className="font-semibold text-xl flex items-center gap-3">
 
-                    {/* Focus Areas */}
-                    {result.areasToReview && result.areasToReview.length > 0 && (
-                        <div className="p-8 rounded-3xl bg-card border border-border/50 shadow-sm space-y-6">
-                            <h4 className="font-semibold text-xl flex items-center gap-3">
-                                <span className="p-2 rounded-lg bg-orange-500/10 text-orange-600">
-                                    <BrainCircuit className="size-5" />
-                                </span>
-                                Areas to Review
-                            </h4>
-                            <ul className="space-y-4">
-                                {result.areasToReview.map((area: string, i: number) => (
-                                    <li key={i} className="text-muted-foreground flex items-start gap-3 text-base leading-relaxed">
-                                        <span className="mt-2 size-2 rounded-full bg-orange-500/50 flex-shrink-0" />
-                                        <span>{area}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                </div>
-
-                <div className="space-y-6 pt-8">
-                    <h3 className="font-semibold text-2xl px-2">Detailed Review</h3>
-                    {quiz.questions.map((q: any, idx: number) => {
-                        const userAnswer = answers[q.id];
-                        const selectedOption = q.options.find((o: any) => o.id === userAnswer);
-                        const correctOption = q.options.find((o: any) => o.isCorrect);
-
-                        const isCorrect = selectedOption?.id === correctOption?.id;
-
-                        return (
-                            <div key={q.id} className="p-6 rounded-2xl bg-background border border-border/60 shadow-sm space-y-4">
-                                <div className="flex gap-4">
-                                    <span className={cn(
-                                        "flex-shrink-0 size-8 rounded-full flex items-center justify-center text-sm font-bold border",
-                                        isCorrect ? "bg-green-500/10 border-green-500/20 text-green-600" : "bg-red-500/10 border-red-500/20 text-red-600"
-                                    )}>
-                                        {idx + 1}
+                                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
+                                        AI Tutor Insight
                                     </span>
-                                    <div className="space-y-4 flex-1">
-                                        <p className="font-medium text-lg leading-snug">{q.question}</p>
-                                        <div className="space-y-2">
-                                            {q.options.map((opt: any) => (
-                                                <div
-                                                    key={opt.id}
-                                                    className={cn(
-                                                        "p-3 rounded-lg border text-sm flex items-center justify-between transition-colors",
-                                                        opt.id === correctOption?.id ? "bg-green-500/10 border-green-500/50 text-green-700 dark:text-green-300 font-medium" :
-                                                            opt.id === userAnswer && opt.id !== correctOption?.id ? "bg-red-500/10 border-red-500/50 text-red-700 dark:text-red-300" :
-                                                                "bg-transparent border-border/50 text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <span>{opt.text}</span>
-                                                    {opt.id === correctOption?.id && <CheckCircle2 className="size-4 text-green-500" />}
-                                                    {opt.id === userAnswer && opt.id !== correctOption?.id && <XCircle className="size-4 text-red-500" />}
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="text-sm p-4 bg-secondary/50 rounded-xl border border-secondary">
-                                            <span className="font-semibold text-foreground block mb-1">Explanation</span>
-                                            <span className="text-muted-foreground">{q.explanation}</span>
-                                        </div>
-                                    </div>
-                                </div>
+                                </h3>
+                                <p className="text-muted-foreground leading-relaxed text-lg font-medium italic">
+                                    "{result.feedback}"
+                                </p>
                             </div>
-                        )
-                    })}
-                </div>
+                        </div>
+                    </div>
 
-                <div className="flex justify-center pt-10">
-                    <Link href={`/course/${quiz.courseId}`}>
-                        <Button variant="outline" className="rounded-full px-8">Back to Course</Button>
-                    </Link>
+                    <div className="flex justify-center pt-10">
+                        <Link href={`/course/${quiz.courseId}`}>
+                            <Button size="lg" variant="outline" className="rounded-full px-10 h-14 border-primary/20 hover:bg-primary/5 text-lg">Return to Course</Button>
+                        </Link>
+                    </div>
                 </div>
             </div>
         )
     }
 
+    // Question View
     return (
-        <div className="max-w-2xl mx-auto space-y-8 animate-in slide-in-from-right-10 duration-500 min-h-[70vh] flex flex-col justify-center">
-            {/* Progress Bar */}
-            <div className="space-y-3">
-                <div className="flex justify-between text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    <span>Question {currentQuestionIndex + 1} of {totalQuestions}</span>
-                </div>
-                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }} />
-                </div>
-            </div>
+        <div className="relative min-h-[80vh] flex flex-col justify-center py-6 px-4 md:px-8">
+            <BackgroundGlow />
 
-            {/* Question Card */}
-            <div className="p-8 md:p-10 rounded-[2rem] bg-card border border-border shadow-sm space-y-8 relative overflow-visible">
-                {/* Decorative Background Element */}
-                <div className="absolute -top-10 -right-10 size-40 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-
-                <h2 className="text-2xl md:text-3xl font-bold leading-tight relative z-10">
-                    {currentQuestion.question}
-                </h2>
-
-                <div className="space-y-3 relative z-10">
-                    {currentQuestion.options.map((option: any) => (
-                        <button
-                            key={option.id}
-                            onClick={() => handleSelectOption(option.id)}
-                            className={cn(
-                                "w-full text-left p-5 rounded-xl border-2 transition-all duration-200 text-lg",
-                                answers[currentQuestion.id] === option.id
-                                    ? "bg-primary/5 border-primary text-primary shadow-sm"
-                                    : "bg-background border-transparent hover:bg-secondary hover:border-secondary-foreground/10 text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            {option.text}
-                        </button>
-                    ))}
+            <div className="relative z-10 max-w-4xl mx-auto w-full space-y-8 animate-in slide-in-from-right-8 duration-500">
+                {/* Progress Header */}
+                <div className="space-y-2">
+                    <div className="flex justify-between items-end px-1">
+                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Question {currentQuestionIndex + 1} of {totalQuestions}</span>
+                        <span className="text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-md">{Math.round(((currentQuestionIndex + 1) / totalQuestions) * 100)}%</span>
+                    </div>
+                    <div className="h-1.5 bg-secondary/50 rounded-full overflow-hidden backdrop-blur-sm">
+                        <div className="h-full bg-gradient-to-r from-primary to-purple-500 transition-all duration-700 ease-out" style={{ width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }} />
+                    </div>
                 </div>
 
-                <div className="flex justify-end pt-6">
+                {/* Main Content Area */}
+                <div className="space-y-6">
+                    <h2 className="text-2xl md:text-3xl font-bold leading-tight text-foreground drop-shadow-sm">
+                        {currentQuestion.question}
+                    </h2>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {currentQuestion.options.map((option: any, idx: number) => {
+                            const isSelected = answers[currentQuestion.id] === option.id;
+                            const letter = String.fromCharCode(65 + idx); // A, B, C...
+
+                            return (
+                                <button
+                                    key={option.id}
+                                    onClick={() => handleSelectOption(option.id)}
+                                    className={cn(
+                                        "group relative overflow-hidden w-full text-left p-4 rounded-xl border transition-all duration-200",
+                                        isSelected
+                                            ? "bg-primary/10 border-primary shadow-[0_0_15px_rgba(var(--primary),0.1)]"
+                                            : "bg-card/40 border-border/50 hover:bg-card/80 hover:border-primary/30 backdrop-blur-md"
+                                    )}
+                                >
+                                    <div className="flex items-center gap-4 relative z-10">
+                                        <span className={cn(
+                                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold transition-colors duration-200",
+                                            isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary"
+                                        )}>
+                                            {letter}
+                                        </span>
+                                        <span className={cn(
+                                            "text-base font-medium transition-colors leading-snug",
+                                            isSelected ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                                        )}>
+                                            {option.text}
+                                        </span>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Footer Controls */}
+                <div className="flex justify-end pt-6 border-t border-white/5">
                     <Button
                         onClick={handleNext}
                         disabled={!answers[currentQuestion.id] || isSubmitting}
-                        size="lg"
-                        className="rounded-full px-10 h-14 text-lg shadow-xl shadow-primary/20 hover:scale-105 transition-all"
+                        size="default"
+                        className={cn(
+                            "rounded-full px-8 h-12 text-base shadow-lg transition-all duration-300",
+                            answers[currentQuestion.id] ? "hover:scale-105 hover:shadow-primary/30" : "opacity-50 cursor-not-allowed"
+                        )}
                     >
                         {currentQuestionIndex === totalQuestions - 1 ?
-                            (isSubmitting ? "Submitting..." : "Finish Quiz") :
-                            "Next Question"
+                            (isSubmitting ? "Submitting..." : "Finish") :
+                            "Next"
                         }
-                        {!isSubmitting && <ArrowRight className="ml-2 size-5" />}
+                        {!isSubmitting && <ArrowRight className="ml-2 size-4" />}
                     </Button>
                 </div>
             </div>

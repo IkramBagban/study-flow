@@ -2,8 +2,7 @@
 import { prisma } from "@study-flow/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { RegenerateButton } from "@/components/regenerate-button";
-import { ScrollText, PlayCircle } from "lucide-react";
+import { ArrowRight, Layers } from "lucide-react";
 import { CourseGenerationLoader } from "@/components/course-generation-loader";
 
 export default async function CoursePage(props: { params: Promise<{ id: string }> }) {
@@ -12,11 +11,11 @@ export default async function CoursePage(props: { params: Promise<{ id: string }
         where: { id: params.id },
         include: {
             modules: {
+                orderBy: { order: 'asc' },
                 include: {
                     chapters: {
-                        include: {
-                            concepts: true
-                        }
+                        orderBy: { order: 'asc' },
+                        take: 1
                     }
                 }
             }
@@ -31,78 +30,68 @@ export default async function CoursePage(props: { params: Promise<{ id: string }
         return <CourseGenerationLoader courseId={course.id} />;
     }
 
+    const firstChapterLink = course.modules[0]?.chapters[0]
+        ? `/course/${course.id}/chapter/${course.modules[0].chapters[0].id}`
+        : "#";
+
     return (
-        <>
-            <div className="mb-12 space-y-4">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                    <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                    </span>
-                    Learning Path Generated
+        <div className="max-w-4xl mx-auto py-16 px-6 space-y-16 animate-in fade-in duration-500">
+            {/* Minimal Header */}
+            <div className="space-y-6 text-center">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 text-primary text-xs font-medium mx-auto border border-primary/10">
+                    <Layers className="h-3 w-3" />
+                    Course Overview
                 </div>
-                <h2 className="text-4xl font-bold tracking-tight">Your Learning Map</h2>
-                <p className="text-lg text-muted-foreground max-w-2xl">
-                    We've broken down <span className="text-foreground font-semibold">{course.subject}</span> into {course.modules.length} key modules.
-                    Start your journey below.
+                <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-foreground">
+                    {course.title || course.subject}
+                </h1>
+                <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                    {course.description || `A structured learning path for mastering ${course.subject}.`}
                 </p>
-            </div>
-
-            <div className="grid gap-8">
-                {course.modules.map((module, i) => (
-                    <div key={module.id} className="relative group">
-                        <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/10 to-emerald-500/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity blur-xl" />
-                        <div className="relative border border-border bg-card rounded-xl overflow-hidden">
-                            <div className="p-6 md:p-8 flex flex-col md:flex-row gap-6 items-start md:items-center border-b border-border/50">
-                                <div className="h-16 w-16 rounded-2xl bg-secondary flex items-center justify-center text-2xl font-bold text-muted-foreground/50 shrink-0">
-                                    0{i + 1}
-                                </div>
-                                <div className="flex-1 space-y-1">
-                                    <h3 className="text-2xl font-semibold">{module.title}</h3>
-                                    <p className="text-muted-foreground">{module.description}</p>
-                                </div>
-                            </div>
-                            <div className="bg-secondary/20 p-6 grid md:grid-cols-2 gap-4">
-                                {module.chapters.map((chapter) => (
-                                    <Link
-                                        key={chapter.id}
-                                        href={`/course/${course.id}/chapter/${chapter.id}`}
-                                        className="flex items-start justify-between gap-4 p-4 rounded-lg bg-background border border-border/50 hover:border-primary/50 transition-all group/chapter"
-                                    >
-                                        <div className="flex items-start gap-4">
-                                            <div className="mt-1 h-2 w-2 rounded-full bg-blue-500 shrink-0" />
-                                            <div className="space-y-1">
-                                                <div className="font-medium text-sm transition-colors group-hover/chapter:text-primary">{chapter.title}</div>
-                                                <div className="text-xs text-muted-foreground flex items-center gap-2">
-                                                    <span>{chapter.estimatedTime}</span>
-                                                    <span>•</span>
-                                                    <span>{chapter.concepts.length} concepts</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <RegenerateButton chapterId={chapter.id} variant="icon" className="opacity-0 group-hover/chapter:opacity-100" />
-                                    </Link>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Final Exam Section */}
-            <div className="mt-12 p-8 rounded-3xl bg-gradient-to-br from-primary/5 via-primary/10 to-background border border-primary/20 text-center space-y-6">
-                <div className="space-y-2">
-                    <h2 className="text-3xl font-bold">Course Final Exam</h2>
-                    <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-                        Verify your mastery of {course.subject} with a comprehensive assessment covering all modules.
-                    </p>
+                <div className="pt-4">
+                    <Link href={firstChapterLink}>
+                        <button className="px-8 py-3 bg-primary text-primary-foreground font-medium rounded-full hover:opacity-90 transition-all shadow-lg shadow-primary/20 hover:scale-105 active:scale-95">
+                            Start Learning
+                        </button>
+                    </Link>
                 </div>
-                <Link href={`/course/${course.id}/quiz`}>
-                    <button className="px-8 py-4 bg-primary text-primary-foreground font-semibold rounded-full hover:scale-105 transition-transform shadow-lg shadow-primary/20 flex items-center gap-2 mx-auto">
-                        Start Final Exam
-                    </button>
-                </Link>
             </div>
-        </>
+
+            {/* Clean List */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-border/40">
+                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Curriculum</h2>
+                    <span className="text-sm text-muted-foreground">{course.modules.length} Modules</span>
+                </div>
+
+                <div className="grid gap-3">
+                    {course.modules.map((module, i) => {
+                        const firstChapterId = module.chapters[0]?.id;
+                        const href = firstChapterId ? `/course/${course.id}/chapter/${firstChapterId}` : "#";
+
+                        return (
+                            <Link href={href} key={module.id} className="group block">
+                                <div className="flex items-center gap-6 p-6 rounded-xl border border-border/40 bg-card/30 hover:bg-card hover:border-primary/20 hover:shadow-sm transition-all duration-200">
+                                    <div className="h-10 w-10 flex items-center justify-center text-lg font-bold text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0">
+                                        {String(i + 1).padStart(2, '0')}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-xl font-medium text-foreground group-hover:text-primary transition-colors truncate">
+                                            {module.title}
+                                        </h3>
+                                        <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
+                                            {module.description}
+                                        </p>
+                                    </div>
+                                    <div className="h-8 w-8 rounded-full border border-border/50 flex items-center justify-center text-muted-foreground/50 group-hover:border-primary/30 group-hover:text-primary transition-all group-hover:translate-x-1">
+                                        <ArrowRight className="h-4 w-4" />
+                                    </div>
+                                </div>
+                            </Link>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
     );
 }

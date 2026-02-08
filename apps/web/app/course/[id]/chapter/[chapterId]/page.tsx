@@ -1,35 +1,19 @@
 
 import { prisma } from "@study-flow/db";
 import { notFound } from "next/navigation";
-import { CourseService } from "@/lib/ai/course-service";
-import { ChevronRight, PlayCircle, BookOpen, CheckCircle, BrainCircuit } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Visualizer } from "@/components/visualizers/visualizer";
-
-import { ChapterContentLoader } from "@/components/chapter-content-loader";
 import { BlockRenderer } from "@/components/block-renderer";
 import { RegenerateButton } from "@/components/regenerate-button";
-
-import Link from "next/link";
-import { Brain, FileQuestion, ScrollText } from "lucide-react";
+import { ChapterContentLoader } from "@/components/chapter-content-loader";
+import { ChevronRight, BookOpen, CheckCircle, PlayCircle, Sparkles } from "lucide-react";
 
 export default async function ChapterPage(props: { params: Promise<{ id: string; chapterId: string }> }) {
-    console.log("[ChapterPage] Rendering...");
     const params = await props.params;
-    console.log("[ChapterPage] Params:", params);
 
-    // Fetch chapter with concepts
     const chapter = await prisma.chapter.findUnique({
         where: { id: params.chapterId },
         include: {
-            concepts: {
-                orderBy: { order: 'asc' }
-            },
-            module: {
-                include: {
-                    course: true
-                }
-            }
+            concepts: { orderBy: { order: 'asc' } },
+            module: { include: { course: true } }
         }
     });
 
@@ -37,143 +21,111 @@ export default async function ChapterPage(props: { params: Promise<{ id: string;
 
     const missingContent = chapter.concepts.some(c => !c.isReady);
 
-    // Client Component Loader State
+    // Subtle background glow
+    const backgroundGlow = (
+        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+            <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full mix-blend-screen" />
+            <div className="absolute bottom-[-10%] right-[10%] w-[600px] h-[600px] bg-blue-500/5 blur-[100px] rounded-full mix-blend-screen" />
+        </div>
+    );
+
     if (missingContent) {
         return (
-            <div className="space-y-8 animate-in fade-in duration-500">
-                <div className="border-b border-border pb-6">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                        <span>{chapter.module.course.title}</span>
-                        <ChevronRight className="size-4" />
-                        <span>{chapter.module.title}</span>
-                        <ChevronRight className="size-4" />
-                        <span className="text-foreground font-medium">{chapter.title}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                        <h1 className="text-4xl font-bold">{chapter.title}</h1>
-                        <RegenerateButton chapterId={chapter.id} />
-                    </div>
+            <div className="relative min-h-screen bg-background">
+                {backgroundGlow}
+                <div className="relative z-10 max-w-3xl mx-auto py-16 px-8">
+                    <ChapterContentLoader chapterId={chapter.id} />
                 </div>
-
-                <ChapterContentLoader chapterId={chapter.id} />
             </div>
         );
     }
 
-    // optimizing re-fetch or relying on the first fetch if we assume CourseService doesn't error clearly.
-    // For simplicity, let's re-fetch concepts to render them.
-    const concepts = await prisma.concept.findMany({
-        where: { chapterId: chapter.id },
-        orderBy: { order: 'asc' }
-    });
-
     return (
-        <div className="flex flex-col lg:flex-row gap-8 relative animate-in fade-in duration-500">
-            {/* Main Content */}
-            <div className="flex-1 min-w-0 space-y-8">
-                <div className="border-b border-border pb-6">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                        <span>{chapter.module.course.title}</span>
-                        <ChevronRight className="size-4" />
-                        <span>{chapter.module.title}</span>
-                        <ChevronRight className="size-4" />
-                        <span className="text-foreground font-medium">{chapter.title}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                        <h1 className="text-4xl font-bold">{chapter.title}</h1>
-                        <RegenerateButton chapterId={chapter.id} />
-                    </div>
-                    <div className="flex items-center gap-4 mt-4">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-sm font-medium">
-                            <BookOpen className="size-4" />
-                            {concepts.length} Key Concepts
-                        </span>
-                    </div>
-                </div>
+        <div className="relative min-h-screen bg-background overflow-x-hidden">
+            {backgroundGlow}
 
-                <div className="space-y-12">
-                    {concepts.map((concept, i) => (
-                        <section key={concept.id} className="relative group">
-                            <div className="absolute -left-12 top-0 hidden lg:flex flex-col items-center h-full">
-                                <div className="size-8 rounded-full bg-secondary border border-border/50 flex items-center justify-center text-[11px] font-bold text-muted-foreground/40 z-10 transition-colors group-hover:text-primary/70 group-hover:border-primary/30">
-                                    {String(i + 1).padStart(2, '0')}
+            <div className="relative z-10 max-w-5xl mx-auto py-16 px-8 md:px-12">
+                {/* Header */}
+                <header className="mb-20 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <nav className="flex items-center gap-2 text-sm text-muted-foreground/60 mb-8">
+                        <span className="truncate">{chapter.module.course.title}</span>
+                        <ChevronRight className="h-3 w-3 shrink-0 opacity-50" />
+                        <span className="truncate">{chapter.module.title}</span>
+                    </nav>
+
+                    <div className="space-y-6">
+                        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-foreground leading-[1.1]">
+                            {chapter.title}
+                        </h1>
+
+                        <div className="flex items-center gap-4">
+                            <RegenerateButton chapterId={chapter.id} />
+                            <div className="h-8 px-3 flex items-center gap-2 rounded-full border border-border/50 bg-secondary/30 text-xs font-medium text-muted-foreground">
+                                <BookOpen className="h-3.5 w-3.5" />
+                                <span>{chapter.concepts.length} Concepts</span>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                {/* Concepts Stream */}
+                <div className="space-y-16">
+                    {chapter.concepts.map((concept, i) => (
+                        <section key={concept.id} id={`concept-${concept.id}`} className="group relative pl-0 lg:pl-8 scroll-mt-32">
+                            {/* Timeline (Desktop Only) */}
+                            <div className="absolute left-[-1rem] top-0 bottom-0 w-px bg-border/40 hidden lg:block group-last:bottom-auto group-last:h-full">
+                                <div className="absolute left-1/2 -translate-x-1/2 top-4 w-6 h-6 rounded-full bg-background border border-border flex items-center justify-center text-[10px] font-bold text-muted-foreground z-10 group-hover:border-primary group-hover:text-primary transition-colors">
+                                    {i + 1}
                                 </div>
-                                {i !== concepts.length - 1 && (
-                                    <div className="w-px h-full bg-border -my-2" />
-                                )}
+                            </div>
+
+                            {/* Mobile Number */}
+                            <div className="lg:hidden mb-4 flex items-center gap-3">
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs font-bold text-muted-foreground">
+                                    {i + 1}
+                                </span>
+                                <h2 className="text-xl font-bold tracking-tight">{concept.title}</h2>
                             </div>
 
                             <div className="space-y-6">
-                                <div className="flex items-center gap-3">
-                                    <h2 className="text-2xl font-semibold">{concept.title}</h2>
-                                </div>
+                                <h2 className="text-2xl font-bold tracking-tight text-foreground hidden lg:block group-hover:text-primary transition-colors duration-300">
+                                    {concept.title}
+                                </h2>
 
-                                {/* Dynamic Block Renderer */}
-                                {concept.isReady && Array.isArray(concept.content) ? (
-                                    <div className="p-6 rounded-2xl bg-card border border-border shadow-sm space-y-8">
-                                        {(concept.content as any[]).map((block, idx) => (
-                                            <BlockRenderer
-                                                key={idx}
-                                                block={block}
-                                                conceptId={concept.id}
-                                                blockIndex={idx}
-                                            />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="p-8 rounded-2xl border border-dashed border-border flex flex-col items-center justify-center text-muted-foreground gap-3">
-                                        <PlayCircle className="size-8 animate-pulse text-primary" />
-                                        <p>Director Agent is composing content blocks...</p>
-                                    </div>
-                                )}
+                                {/* Content Card */}
+                                <div className="prose prose-slate dark:prose-invert max-w-none 
+                                         bg-card/30 backdrop-blur-sm border border-border/40 rounded-2xl p-6 md:p-8
+                                         shadow-sm hover:shadow-md transition-all duration-300
+                                         prose-headings:font-bold prose-p:leading-relaxed prose-img:rounded-xl">
+                                    {concept.content && Array.isArray(concept.content) ? (
+                                        (concept.content as any[]).map((block, idx) => (
+                                            <div key={idx} className="mb-6 last:mb-0">
+                                                <BlockRenderer
+                                                    block={block}
+                                                    conceptId={concept.id}
+                                                    blockIndex={idx}
+                                                />
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="py-12 flex flex-col items-center justify-center text-muted-foreground gap-3">
+                                            <PlayCircle className="size-8 animate-pulse text-primary/40" />
+                                            <p className="text-sm">Loading content...</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </section>
                     ))}
                 </div>
 
-                <div className="pt-12 border-t border-border mt-12 flex justify-end">
-                    <button className="px-8 py-3 rounded-full bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors flex items-center gap-2">
-                        Complete Chapter <CheckCircle className="size-5" />
+                {/* Footer Goal */}
+                <div className="mt-32 pb-20 flex justify-center border-t border-border/40 pt-12">
+                    <button className="px-8 py-3 bg-primary text-primary-foreground font-semibold rounded-full shadow-lg hover:opacity-90 hover:scale-105 transition-all flex items-center gap-2">
+                        Complete Chapter <CheckCircle className="h-4 w-4" />
                     </button>
                 </div>
             </div>
-
-            {/* Right Side Toolbar (Sticky) */}
-            <aside className="hidden lg:flex flex-col gap-4 w-16 shrink-0 z-10">
-                <div className="sticky top-8 flex flex-col gap-4">
-                    {/* Flashcards (Active) */}
-                    <Link
-                        href={`/course/${chapter.module.course.id}/flashcards?chapterId=${chapter.id}`}
-                        className="group relative flex items-center justify-center w-12 h-12 rounded-2xl bg-background border border-border/50 shadow-sm hover:scale-110 hover:shadow-md hover:border-primary/50 transition-all duration-300"
-                        title="Practice Flashcards"
-                    >
-                        <Brain className="size-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                        <span className="absolute right-full mr-3 px-2 py-1 rounded bg-popover text-popover-foreground text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-sm">
-                            Flashcards
-                        </span>
-                    </Link>
-
-                    {/* Quiz (Active) */}
-                    <Link
-                        href={`/course/${chapter.module.course.id}/chapter/${chapter.id}/quiz`}
-                        className="group relative flex items-center justify-center w-12 h-12 rounded-2xl bg-background border border-border/50 shadow-sm hover:scale-110 hover:shadow-md hover:border-primary/50 transition-all duration-300"
-                        title="Take Chapter Quiz"
-                    >
-                        <ScrollText className="size-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                        <span className="absolute right-full mr-3 px-2 py-1 rounded bg-popover text-popover-foreground text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-sm">
-                            Take Quiz
-                        </span>
-                    </Link>
-
-                    {/* Test (Coming Soon) */}
-                    <div className="group relative flex items-center justify-center w-12 h-12 rounded-2xl bg-secondary/50 border border-transparent opacity-60 cursor-not-allowed">
-                        <FileQuestion className="size-5 text-muted-foreground" />
-                        <span className="absolute right-full mr-3 px-2 py-1 rounded bg-popover text-popover-foreground text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                            Test (Coming Soon)
-                        </span>
-                    </div>
-                </div>
-            </aside>
         </div>
     );
 }

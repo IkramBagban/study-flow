@@ -180,33 +180,36 @@ export default function FlashcardsPage() {
     }
 
     return (
-        <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="max-w-5xl mx-auto py-12 px-6 lg:px-8 space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Header */}
             {view === 'decks' && (
-                <header className="flex items-center justify-between pb-6 border-b border-border">
-                    <div>
-                        <h1 className="text-3xl font-bold flex items-center gap-3">
-                            <GalleryVerticalEnd className="size-8 text-primary" />
-                            Flashcard Decks
-                        </h1>
-                        <p className="text-muted-foreground mt-2">
-                            Select a deck to start reviewing
-                        </p>
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-border/40">
+                    <div className="space-y-4">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">
+                            <GalleryVerticalEnd className="size-3" />
+                            <span>Spaced Repetition System</span>
+                        </div>
+                        <div>
+                            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">Flashcard Decks</h1>
+                            <p className="text-muted-foreground text-lg">
+                                Master your course concepts through active recall.
+                            </p>
+                        </div>
                     </div>
 
                     <div className="flex gap-4">
-                        <div className="text-center px-4 py-2 bg-muted/30 rounded-lg border border-border">
+                        <div className="flex flex-col items-center justify-center min-w-[100px] px-4 py-3 bg-secondary/20 rounded-2xl border border-border/50 backdrop-blur-sm">
                             <div className="text-2xl font-bold text-foreground">{flashcards.length}</div>
-                            <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total</div>
+                            <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Total</div>
                         </div>
-                        <div className="text-center px-4 py-2 bg-primary/10 rounded-lg border border-primary/20">
+                        <div className="flex flex-col items-center justify-center min-w-[100px] px-4 py-3 bg-primary/5 rounded-2xl border border-primary/20 backdrop-blur-sm">
                             <div className="text-2xl font-bold text-primary">
                                 {flashcards.filter(c => new Date(c.due) <= new Date()).length}
                             </div>
-                            <div className="text-xs text-primary/80 uppercase font-bold tracking-wider">Due</div>
+                            <div className="text-[10px] text-primary/80 uppercase font-bold tracking-widest">Due Now</div>
                         </div>
                     </div>
-                </header>
+                </div>
             )}
 
             {/* Decks Grid View */}
