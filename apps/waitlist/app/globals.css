@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f7fb;
+  --foreground: #0f172a;
+  --muted: #5b6478;
+  --card: #ffffff;
+  --stroke: rgba(148, 163, 184, 0.35);
+  --accent: #6366f1;
+  --accent-soft: #e0e7ff;
+  --mint: #34d399;
+  --sunrise: #f59e0b;
+  --font-body: var(--font-inter);
+  --font-display: var(--font-sora);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body), "Inter", system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+.font-display {
+  font-family: var(--font-display), "Sora", system-ui, sans-serif;
+}
+
+.glow-card {
+  box-shadow: 0 20px 45px rgba(79, 70, 229, 0.12);
+}
+
+.hero-gradient {
+  background: radial-gradient(circle at top left, rgba(99, 102, 241, 0.25), transparent 55%),
+    radial-gradient(circle at 15% 70%, rgba(52, 211, 153, 0.2), transparent 55%),
+    radial-gradient(circle at 80% 20%, rgba(245, 158, 11, 0.15), transparent 55%),
+    linear-gradient(180deg, #f8f8ff 0%, #f5f7ff 40%, #f7f7fb 100%);
+}
+
+.section-divider {
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.3), transparent);
+  height: 1px;
+}
