@@ -1,6 +1,7 @@
 import { prisma } from "@study-flow/db";
 import { NextRequest, NextResponse } from "next/server";
 import { FSRS, Rating, State, type FSRSCard } from "@/lib/fsrs";
+import { getSessionUserId, userOwnsFlashcard } from "@/lib/course-auth";
 
 export async function POST(
     req: NextRequest,
@@ -9,6 +10,11 @@ export async function POST(
     try {
         const { cardId } = await params;
         const { rating } = await req.json(); // 1 (Again), 2 (Hard), 3 (Good), 4 (Easy)
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!await userOwnsFlashcard(userId, cardId)) {
+            return NextResponse.json({ error: "Card not found" }, { status: 404 });
+        }
 
         // Validate rating
         if (!rating || rating < 1 || rating > 4) {

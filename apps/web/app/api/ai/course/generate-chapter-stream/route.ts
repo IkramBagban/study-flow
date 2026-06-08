@@ -1,11 +1,19 @@
 import { NextRequest } from "next/server";
 import { CourseService } from "@/lib/ai/course-service";
+import { NextResponse } from "next/server";
+import { getSessionUserId, userOwnsChapter } from "@/lib/course-auth";
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
     const { chapterId } = await req.json();
+    if (!chapterId) return NextResponse.json({ error: "Chapter ID is required" }, { status: 400 });
+    const userId = await getSessionUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!await userOwnsChapter(userId, chapterId)) {
+        return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
+    }
 
     // Create a readable stream for SSE
     const encoder = new TextEncoder();

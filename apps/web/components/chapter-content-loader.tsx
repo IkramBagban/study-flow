@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { BrainCircuit, Terminal, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BlockRenderer } from "@/components/block-renderer";
+import { apiErrorMessage } from "@/lib/api-client-errors";
 
 type LogEvent = {
     id: string;
@@ -53,7 +54,11 @@ export function ChapterContentLoader({ chapterId }: { chapterId: string }) {
                     signal: controller.signal
                 });
 
-                if (!response.ok) throw new Error("Stream failed");
+                if (!response.ok) {
+                    const message = await apiErrorMessage(response, "Chapter generation failed.");
+                    if (response.status === 401) router.push("/login");
+                    throw new Error(message);
+                }
                 if (!response.body) throw new Error("No response body");
 
                 const reader = response.body.getReader();
@@ -111,7 +116,7 @@ export function ChapterContentLoader({ chapterId }: { chapterId: string }) {
             } catch (err: any) {
                 if (err.name === 'AbortError') return;
                 console.error(err);
-                if (mounted) addLog("Connection lost. Retrying...", "error");
+                if (mounted) addLog(err.message || "Connection lost. Retrying...", "error");
             }
         };
 

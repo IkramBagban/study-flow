@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@study-flow/db";
+import { getSessionUserId, userOwnsResource } from "@/lib/course-auth";
 
 export async function GET(
     req: NextRequest,
@@ -7,6 +8,11 @@ export async function GET(
 ) {
     try {
         const { courseId, resourceId } = await params;
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!await userOwnsResource(userId, courseId, resourceId)) {
+            return NextResponse.json({ error: "Resource not found" }, { status: 404 });
+        }
 
         const resource = await prisma.resource.findUnique({
             where: {

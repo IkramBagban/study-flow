@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { apiErrorMessage } from "@/lib/api-client-errors";
 
 export interface BlockData {
     conceptTitle: string;
@@ -57,6 +58,10 @@ export function useChapterGenerationStream(chapterId: string) {
                 body: JSON.stringify({ chapterId }),
                 signal: abortControllerRef.current.signal,
             });
+
+            if (!response.ok) {
+                throw new Error(await apiErrorMessage(response, "Chapter generation failed."));
+            }
 
             if (!response.body) {
                 throw new Error('No response body');

@@ -1,9 +1,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@study-flow/db";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
 import { StorageService } from "@/lib/storage/storage-service";
+import { getSessionUserId, userOwnsResource } from "@/lib/course-auth";
 
 export async function DELETE(
     req: NextRequest,
@@ -11,25 +10,17 @@ export async function DELETE(
 ) {
     try {
         const { courseId, resourceId } = await params;
-        const session = await auth.api.getSession({ headers: await headers() });
-
-        if (!session) {
+        const userId = await getSessionUserId();
+        if (!userId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
-
-        // Verify ownership
-        const course = await prisma.course.findUnique({
-            where: { id: courseId },
-            select: { userId: true }
-        });
-
-        if (!course || course.userId !== session.user.id) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        if (!await userOwnsResource(userId, courseId, resourceId)) {
+            return NextResponse.json({ error: "Resource not found" }, { status: 404 });
         }
 
         // Get resource to find fileKey
-        const resource = await prisma.resource.findUnique({
-            where: { id: resourceId }
+        const resource = await prisma.resource.findFirst({
+            where: { id: resourceId, courseId }
         });
 
         if (!resource) {

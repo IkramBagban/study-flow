@@ -11,7 +11,7 @@ export async function getChapterQuiz(chapterId: string) {
     if (!session) throw new Error("Unauthorized");
 
     const existingQuiz = await prisma.quiz.findFirst({
-        where: { chapterId },
+        where: { chapterId, chapter: { module: { course: { userId: session.user.id } } } },
         include: {
             questions: {
                 include: { options: true },
@@ -30,8 +30,8 @@ export async function getChapterQuiz(chapterId: string) {
     }
 
     // Generate new quiz
-    const chapter = await prisma.chapter.findUnique({
-        where: { id: chapterId },
+    const chapter = await prisma.chapter.findFirst({
+        where: { id: chapterId, module: { course: { userId: session.user.id } } },
         include: {
             module: { include: { course: true } },
             concepts: true
@@ -89,8 +89,8 @@ export async function submitQuizAttempt(
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) throw new Error("Unauthorized");
 
-    const quiz = await prisma.quiz.findUnique({
-        where: { id: quizId },
+    const quiz = await prisma.quiz.findFirst({
+        where: { id: quizId, course: { userId: session.user.id } },
         include: { questions: { include: { options: true } } }
     });
 
@@ -180,7 +180,7 @@ export async function getCourseQuiz(courseId: string) {
     if (!session) throw new Error("Unauthorized");
 
     const existingQuiz = await prisma.quiz.findFirst({
-        where: { courseId, chapterId: null }, // Ensure it's a course quiz, not a chapter one
+        where: { courseId, chapterId: null, course: { userId: session.user.id } }, // Ensure it's a course quiz, not a chapter one
         include: {
             questions: {
                 include: { options: true },
@@ -199,8 +199,8 @@ export async function getCourseQuiz(courseId: string) {
     }
 
     // Generate new quiz
-    const course = await prisma.course.findUnique({
-        where: { id: courseId },
+    const course = await prisma.course.findFirst({
+        where: { id: courseId, userId: session.user.id },
         include: {
             modules: {
                 include: {

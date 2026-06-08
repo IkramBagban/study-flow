@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import { apiErrorMessage } from "@/lib/api-client-errors";
 
 interface Resource {
     id: string;
@@ -25,7 +26,7 @@ interface Resource {
 
 export function ResourceManager() {
     const params = useParams();
-    const courseId = params.courseId as string; // Fix: params.courseId based on route
+    const courseId = (params.id || params.courseId) as string;
     const [resources, setResources] = useState<Resource[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
@@ -57,6 +58,8 @@ export function ResourceManager() {
             if (res.ok) {
                 const data = await res.json();
                 setResources(data);
+            } else {
+                toast.error(await apiErrorMessage(res, "Failed to load resources."));
             }
         } catch (error) {
             console.error("Failed to load resources", error);
@@ -86,12 +89,12 @@ export function ResourceManager() {
                 body: formData,
             });
 
-            if (!res.ok) throw new Error("Upload failed");
+            if (!res.ok) throw new Error(await apiErrorMessage(res, "Upload failed."));
 
             toast.success("File queued for analysis!", { id: toastId });
             fetchResources(); // Immediate refresh to show "QUEUED" state
         } catch (error: any) {
-            toast.error("Upload failed", { id: toastId });
+            toast.error(error.message || "Upload failed", { id: toastId });
         } finally {
             setIsUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = "";
@@ -104,10 +107,11 @@ export function ResourceManager() {
         setResources(prev => prev.filter(r => r.id !== resourceId)); // Optimistic update
 
         try {
-            await fetch(`/api/course/${courseId}/resources/${resourceId}`, { method: "DELETE" });
+            const res = await fetch(`/api/course/${courseId}/resources/${resourceId}`, { method: "DELETE" });
+            if (!res.ok) throw new Error(await apiErrorMessage(res, "Failed to delete resource."));
             toast.success("Resource deleted");
-        } catch (e) {
-            toast.error("Failed to delete");
+        } catch (e: any) {
+            toast.error(e.message || "Failed to delete");
             fetchResources(); // Revert
         }
     };

@@ -25,6 +25,7 @@ import {
 import { SourceButton } from "./source-button"
 import { toast } from "sonner"
 import { Progress } from "./ui/progress"
+import { apiErrorMessage } from "@/lib/api-client-errors"
 
 type Step =
     | "discovery"  // 1. Topic & Level 
@@ -181,8 +182,7 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                 const courseData = await courseRes.json();
                 courseId = courseData.courseId;
             } else {
-                // Fallback or Error
-                throw new Error("Could not create draft course session");
+                throw new Error(await apiErrorMessage(courseRes, "Could not create draft course session."));
             }
 
             // Upload to that course
@@ -205,11 +205,13 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                 // Start Polling
                 pollForAnalysis(courseId, data.resourceId);
             } else {
-                throw new Error("Upload failed");
+                throw new Error(await apiErrorMessage(uploadRes, "Upload failed."));
             }
         } catch (error) {
             console.error(error);
-            toast.error("Failed to upload. Please try again.");
+            const message = error instanceof Error ? error.message : "Failed to upload. Please try again.";
+            toast.error(message);
+            if (message.includes("sign in")) router.push("/login");
         } finally {
             setIsLoading(false);
             if (fileInputRef.current) fileInputRef.current.value = "";
@@ -226,11 +228,24 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                 if (res.ok) {
                     statusData = await res.json();
                 } else {
+                    if (res.status === 401 || res.status === 404) {
+                        clearInterval(interval);
+                        const message = await apiErrorMessage(res, "Could not access this resource.");
+                        toast.error(message);
+                        if (res.status === 401) router.push("/login");
+                        return;
+                    }
                     // Fallback poll list
                     const listRes = await fetch(`/api/course/${courseId}/resources`);
                     if (listRes.ok) {
                         const list = await listRes.json();
                         statusData = list.find((r: any) => r.id === resourceId);
+                    } else if (listRes.status === 401 || listRes.status === 404) {
+                        clearInterval(interval);
+                        const message = await apiErrorMessage(listRes, "Could not access course resources.");
+                        toast.error(message);
+                        if (listRes.status === 401) router.push("/login");
+                        return;
                     }
                 }
 
@@ -289,6 +304,7 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                     action: "domain-map"
                 })
             })
+            if (!res.ok) throw new Error(await apiErrorMessage(res, "Failed to generate concepts."));
             const data = await res.json()
             const concepts = data.domainMap?.keyConcepts || data.keyConcepts
             if (concepts) {
@@ -302,7 +318,9 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
             }
         } catch (e) {
             console.error(e)
-            toast.error("Failed to generate concepts. Try again.")
+            const message = e instanceof Error ? e.message : "Failed to generate concepts. Try again.";
+            toast.error(message)
+            if (message.includes("sign in")) router.push("/login");
         } finally {
             setIsLoading(false)
         }
@@ -326,6 +344,7 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                     concepts: knownConcepts
                 })
             })
+            if (!res.ok) throw new Error(await apiErrorMessage(res, "Failed to generate assessment."));
             const data = await res.json()
             if (data.questions) {
                 setDiagnosticQuestions(data.questions)
@@ -333,7 +352,9 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
             }
         } catch (e) {
             console.error(e)
-            toast.error("Failed to generate assessment.")
+            const message = e instanceof Error ? e.message : "Failed to generate assessment.";
+            toast.error(message)
+            if (message.includes("sign in")) router.push("/login");
         } finally {
             setIsLoading(false)
         }
@@ -366,6 +387,7 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                     quizResults: results
                 })
             })
+            if (!res.ok) throw new Error(await apiErrorMessage(res, "Failed to generate profile."));
             const data = await res.json()
             if (data.judgments) {
                 setJudgments(data.judgments)
@@ -373,6 +395,11 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
             }
         } catch (e) {
             console.error(e)
+            if (e instanceof Error && e.message.includes("sign in")) {
+                toast.error(e.message);
+                router.push("/login");
+                return;
+            }
             // Fallback
             setJudgments([`We've analyzed your performance in ${topic} and are tailoring the course.`]);
             setStep("summary");
@@ -418,6 +445,7 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
                     courseId: undefined // We would pass draft ID if we want to promote it
                 })
             })
+            if (!res.ok) throw new Error(await apiErrorMessage(res, "Failed to create course."));
             const data = await res.json()
             if (data.courseId) {
                 reset(); // Clear storage
@@ -425,6 +453,9 @@ export function CreateCourseFlow({ trigger }: { trigger?: React.ReactNode }) {
             }
         } catch (e) {
             console.error(e)
+            const message = e instanceof Error ? e.message : "Failed to create course.";
+            toast.error(message)
+            if (message.includes("sign in")) router.push("/login");
             setIsLoading(false)
         }
     }

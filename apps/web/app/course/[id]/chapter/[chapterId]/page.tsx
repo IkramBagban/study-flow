@@ -9,8 +9,8 @@ import { ChevronRight, BookOpen, CheckCircle, PlayCircle, Sparkles } from "lucid
 export default async function ChapterPage(props: { params: Promise<{ id: string; chapterId: string }> }) {
     const params = await props.params;
 
-    const chapter = await prisma.chapter.findUnique({
-        where: { id: params.chapterId },
+    const chapter = await prisma.chapter.findFirst({
+        where: { id: params.chapterId, module: { courseId: params.id } },
         include: {
             concepts: { orderBy: { order: 'asc' } },
             module: { include: { course: true } }

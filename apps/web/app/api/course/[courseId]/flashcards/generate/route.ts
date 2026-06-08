@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@study-flow/db";
 import { AIModelFactory } from "@/lib/ai/model-factory";
 import { z } from "zod";
+import { getSessionUserId, userOwnsChapterInCourse, userOwnsCourse } from "@/lib/course-auth";
 
 const FlashcardSchema = z.object({
     front: z.string().describe("The question or prompt on the front of the card"),
@@ -31,6 +32,11 @@ export async function POST(
 
         if (!chapterId) {
             return NextResponse.json({ error: "Chapter ID is required" }, { status: 400 });
+        }
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!await userOwnsCourse(userId, courseId) || !await userOwnsChapterInCourse(userId, courseId, chapterId)) {
+            return NextResponse.json({ error: "Not found" }, { status: 404 });
         }
 
         // 1. Fetch Chapter Content to use as context

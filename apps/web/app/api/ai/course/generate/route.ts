@@ -41,6 +41,13 @@ export const maxDuration = 60; // Allow longer interaction for AI generation
 
 export async function POST(req: NextRequest) {
     try {
+        const session = await auth.api.getSession({
+            headers: await headers()
+        });
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const body = await req.json();
         const { topic, goal, level, action, concepts, selectedConcepts, quizResults, assessmentData, sourceText, useOnlyResources, files, domainMap, structure } = GenerateSchema.parse(body);
 
@@ -61,12 +68,17 @@ export async function POST(req: NextRequest) {
         }
 
         if (action === "course-structure") {
-            const session = await auth.api.getSession({
-                headers: await headers()
-            });
-
-            if (!session) {
-                return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            const resourceIds = [...new Set(files?.flatMap(file => file.id ? [file.id] : []) ?? [])];
+            if (resourceIds.length > 0) {
+                const ownedResources = await prisma.resource.count({
+                    where: {
+                        id: { in: resourceIds },
+                        course: { userId: session.user.id }
+                    }
+                });
+                if (ownedResources !== resourceIds.length) {
+                    return NextResponse.json({ error: "Resource not found" }, { status: 404 });
+                }
             }
 
             const course = await CourseService.generateCourseBlueprint(

@@ -2,11 +2,13 @@
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react"
+import { apiErrorMessage } from "@/lib/api-client-errors"
 
 export function CourseGenerationLoader({ courseId }: { courseId: string }) {
     const router = useRouter();
     const [modules, setModules] = useState<{ id: string, title: string, description: string }[]>([]);
     const [status, setStatus] = useState("GENERATING");
+    const [message, setMessage] = useState("");
 
     useEffect(() => {
         const poll = async () => {
@@ -28,6 +30,17 @@ export function CourseGenerationLoader({ courseId }: { courseId: string }) {
                         setStatus("ERROR");
                         return;
                     }
+                } else {
+                    const errorMessage = await apiErrorMessage(statusRes, "Could not check course generation status.");
+                    setMessage(errorMessage);
+                    if (statusRes.status === 401) {
+                        router.push("/login");
+                        return;
+                    }
+                    if (statusRes.status === 404) {
+                        setStatus("ERROR");
+                        return;
+                    }
                 }
 
                 // Check Outline
@@ -42,6 +55,10 @@ export function CourseGenerationLoader({ courseId }: { courseId: string }) {
                             return prev;
                         });
                     }
+                } else if (outlineRes.status === 401 || outlineRes.status === 404) {
+                    setMessage(await apiErrorMessage(outlineRes, "Could not load course outline."));
+                    if (outlineRes.status === 401) router.push("/login");
+                    else setStatus("ERROR");
                 }
             } catch (e) { console.error(e); }
         };
@@ -60,7 +77,7 @@ export function CourseGenerationLoader({ courseId }: { courseId: string }) {
                 </div>
                 <h2 className="text-2xl font-bold text-red-600">Course Generation Failed</h2>
                 <p className="text-muted-foreground">
-                    Something went wrong while building your course. Please try again or check the server logs.
+                    {message || "Something went wrong while building your course. Please try again or check the server logs."}
                 </p>
                 <button
                     onClick={() => window.location.reload()}

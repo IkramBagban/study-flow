@@ -10,6 +10,7 @@ import { FlashcardData, DeckInfo } from "@/types/flashcard";
 import { DeckCard } from "@/components/flashcards/deck-card";
 import { DeckListView } from "@/components/flashcards/deck-list-view";
 import { ReviewSession } from "@/components/flashcards/review-session";
+import { apiErrorMessage } from "@/lib/api-client-errors";
 
 const DECK_COLORS = [
     'from-violet-500 to-purple-600',
@@ -41,6 +42,9 @@ export default function FlashcardsPage() {
             if (res.ok) {
                 const data = await res.json();
                 setFlashcards(data);
+            } else {
+                toast.error(await apiErrorMessage(res, "Failed to load flashcards."));
+                if (res.status === 401) router.push("/login");
             }
         } catch (err) {
             console.error("Failed to load flashcards", err);
@@ -120,12 +124,12 @@ export default function FlashcardsPage() {
                 body: JSON.stringify({ chapterId, count: 7 })
             });
 
-            if (res.ok) {
-                await fetchCards();
-                toast.success("Successfully generated 7 new flashcards!");
-            } else {
-                toast.error("Failed to generate flashcards.");
+            if (!res.ok) {
+                toast.error(await apiErrorMessage(res, "Failed to generate flashcards."));
+                return;
             }
+            await fetchCards();
+            toast.success("Successfully generated 7 new flashcards!");
         } catch (error) {
             console.error(error);
             toast.error("An error occurred.");

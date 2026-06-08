@@ -1,5 +1,6 @@
 import { prisma } from "@study-flow/db";
 import { NextRequest, NextResponse } from "next/server";
+import { getSessionUserId, userOwnsChapter } from "@/lib/course-auth";
 
 export async function GET(
     request: NextRequest,
@@ -7,6 +8,11 @@ export async function GET(
 ) {
     try {
         const { chapterId } = await params;
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!await userOwnsChapter(userId, chapterId)) {
+            return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
+        }
 
         if (!chapterId) {
             return NextResponse.json(

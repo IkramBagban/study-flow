@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { Visualizer } from "@/components/visualizers/visualizer";
 import { RefreshCcw, MessageSquare, Maximize2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api-client-errors";
 
 interface VisualBlockProps {
     block: any;
@@ -46,12 +48,17 @@ export function VisualBlock({ block: initialBlock, conceptId, blockIndex }: Visu
                 method: "POST",
                 body: JSON.stringify({ feedback: customFeedback })
             });
+            if (!res.ok) {
+                toast.error(await apiErrorMessage(res, "Failed to regenerate visual."));
+                return;
+            }
             const data = await res.json();
             if (data.success && data.block) {
                 setBlock(data.block);
             }
         } catch (error) {
             console.error("Failed to regenerate visual:", error);
+            toast.error("Failed to regenerate visual.");
         } finally {
             setIsRegenerating(false);
             setFeedback("");

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { RefreshCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { apiErrorMessage } from "@/lib/api-client-errors";
 
 interface RegenerateButtonProps {
     chapterId: string;
@@ -30,11 +31,11 @@ export function RegenerateButton({ chapterId, className, variant = "button" }: R
                 method: "POST"
             });
 
-            if (res.ok) {
-                router.refresh();
-            } else {
-                alert("Failed to regenerate chapter");
+            if (!res.ok) {
+                alert(await apiErrorMessage(res, "Failed to regenerate chapter."));
+                return;
             }
+            router.refresh();
         } catch (error) {
             console.error("Regeneration error:", error);
             alert("An error occurred during regeneration");

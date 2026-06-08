@@ -7,6 +7,8 @@ import { ChevronLeft, ChevronRight, Trophy, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { FlashcardData } from "@/types/flashcard";
+import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api-client-errors";
 
 export function ReviewSession({ cards, deckName, onExit }: { cards: FlashcardData[], deckName: string, onExit: () => void }) {
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -82,13 +84,16 @@ export function ReviewSession({ cards, deckName, onExit }: { cards: FlashcardDat
 
     const handleRate = async (rating: number) => {
         try {
-            await fetch(`/api/flashcard/${currentCard.id}/progress`, {
+            const res = await fetch(`/api/flashcard/${currentCard.id}/progress`, {
                 method: 'POST',
                 body: JSON.stringify({ rating })
             });
+            if (!res.ok) throw new Error(await apiErrorMessage(res, "Failed to save review progress."));
             setCompleted(prev => [...prev, currentCard.id]);
         } catch (err) {
             console.error("Failed to save progress", err);
+            toast.error(err instanceof Error ? err.message : "Failed to save review progress.");
+            return;
         }
         handleNext();
     };

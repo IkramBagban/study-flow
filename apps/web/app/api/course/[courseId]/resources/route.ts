@@ -1,16 +1,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@study-flow/db";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { getSessionUserId, userOwnsCourse } from "@/lib/course-auth";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ courseId: string }> }) {
     try {
         const { courseId } = await params;
-        const session = await auth.api.getSession({ headers: await headers() });
-
-        if (!session) {
+        const userId = await getSessionUserId();
+        if (!userId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        if (!await userOwnsCourse(userId, courseId)) {
+            return NextResponse.json({ error: "Not found" }, { status: 404 });
         }
 
         const resources = await prisma.resource.findMany({

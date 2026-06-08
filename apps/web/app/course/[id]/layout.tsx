@@ -10,6 +10,8 @@ import {
     GraduationCap,
     BookOpen
 } from "lucide-react";
+import { redirect } from "next/navigation";
+import { getSessionUserId } from "@/lib/course-auth";
 
 export default async function CourseLayout({
     children,
@@ -20,9 +22,11 @@ export default async function CourseLayout({
 }) {
     const params = await paramsPromise;
     const now = new Date();
+    const userId = await getSessionUserId();
+    if (!userId) redirect("/login");
 
-    const course = await prisma.course.findUnique({
-        where: { id: params.id },
+    const course = await prisma.course.findFirst({
+        where: { id: params.id, userId },
         include: {
             modules: {
                 orderBy: { order: 'asc' },

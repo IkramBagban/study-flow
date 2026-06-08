@@ -1,6 +1,7 @@
 
 import { prisma } from "@study-flow/db";
 import { NextRequest, NextResponse } from "next/server";
+import { getSessionUserId, userOwnsChapterInCourse, userOwnsCourse } from "@/lib/course-auth";
 
 export async function GET(
     req: NextRequest,
@@ -8,6 +9,11 @@ export async function GET(
 ) {
     try {
         const { courseId } = await params;
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!await userOwnsCourse(userId, courseId)) {
+            return NextResponse.json({ error: "Not found" }, { status: 404 });
+        }
 
         const flashcards = await prisma.flashcard.findMany({
             where: { courseId },
@@ -33,6 +39,14 @@ export async function POST(
     try {
         const { courseId } = await params;
         const body = await req.json();
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!await userOwnsCourse(userId, courseId)) {
+            return NextResponse.json({ error: "Not found" }, { status: 404 });
+        }
+        if (body.chapterId && !await userOwnsChapterInCourse(userId, courseId, body.chapterId)) {
+            return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
+        }
 
         // Validated by Zod in frontend/service ideally, but basic check here
         if (!body.front || !body.back) {

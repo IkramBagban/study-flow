@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { CourseService } from "@/lib/ai/course-service";
+import { getSessionUserId, userOwnsChapter } from "@/lib/course-auth";
 
 export const maxDuration = 60; // Allow 60 seconds for AI generation
 
@@ -10,6 +11,11 @@ export async function POST(req: NextRequest) {
 
         if (!chapterId) {
             return NextResponse.json({ error: "Chapter ID is required" }, { status: 400 });
+        }
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!await userOwnsChapter(userId, chapterId)) {
+            return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
         }
 
         console.log(`[API] Generating content for chapter: ${chapterId}`);

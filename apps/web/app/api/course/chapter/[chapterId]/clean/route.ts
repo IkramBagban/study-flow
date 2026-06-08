@@ -1,5 +1,6 @@
 import { prisma } from "@study-flow/db";
 import { NextRequest, NextResponse } from "next/server";
+import { getSessionUserId, userOwnsChapter } from "@/lib/course-auth";
 
 // Helper to clean up JSON-wrapped content
 function cleanContent(content: string): string {
@@ -25,6 +26,11 @@ export async function POST(request: NextRequest) {
 
         if (!chapterId) {
             return NextResponse.json({ error: "Chapter ID is required" }, { status: 400 });
+        }
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!await userOwnsChapter(userId, chapterId)) {
+            return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
         }
 
         const chapter = await prisma.chapter.findUnique({

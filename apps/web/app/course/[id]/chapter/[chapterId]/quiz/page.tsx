@@ -2,10 +2,11 @@ import { getChapterQuiz } from "@/app/actions/quiz";
 import { QuizView } from "@/components/quiz/quiz-view";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { prisma } from "@study-flow/db";
+import { userOwnsChapterInCourse } from "@/lib/course-auth";
 
 export default async function QuizPage(props: {
     params: Promise<{ id: string; chapterId: string }>,
@@ -16,6 +17,9 @@ export default async function QuizPage(props: {
 
     if (!session) {
         redirect("/login");
+    }
+    if (!await userOwnsChapterInCourse(session.user.id, params.id, params.chapterId)) {
+        notFound();
     }
 
     let quiz;
@@ -40,8 +44,8 @@ export default async function QuizPage(props: {
     if (!quiz) return <div>Quiz not found</div>;
 
     // Fetch course title for navigation
-    const course = await prisma.course.findUnique({
-        where: { id: params.id },
+    const course = await prisma.course.findFirst({
+        where: { id: params.id, userId: session.user.id },
         select: { title: true }
     });
 

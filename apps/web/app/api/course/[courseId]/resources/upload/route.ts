@@ -1,13 +1,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { ingestResource } from "@/lib/rag/vector-store";
 import { prisma } from "@study-flow/db";
-
-
+import { getSessionUserId, userOwnsCourse } from "@/lib/course-auth";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ courseId: string }> }) {
     try {
         const { courseId } = await params;
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!await userOwnsCourse(userId, courseId)) {
+            return NextResponse.json({ error: "Not found" }, { status: 404 });
+        }
+
         const formData = await req.formData();
         const file = formData.get("file") as File;
 

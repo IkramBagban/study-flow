@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { generateQuiz } from "@/lib/ai/quiz-service";
 import { AssessmentInputSchema } from "@/lib/ai/schemas";
+import { getSessionUserId } from "@/lib/course-auth";
 
 export async function POST(req: Request) {
     try {
+        if (!await getSessionUserId()) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
         const body = await req.json();
         const validated = AssessmentInputSchema.parse(body);
 

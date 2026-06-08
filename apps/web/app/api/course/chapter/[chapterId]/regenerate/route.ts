@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@study-flow/db";
+import { getSessionUserId, userOwnsChapter } from "@/lib/course-auth";
 
 export async function POST(
     req: NextRequest,
@@ -8,6 +9,12 @@ export async function POST(
     const { chapterId } = await props.params;
 
     try {
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!await userOwnsChapter(userId, chapterId)) {
+            return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
+        }
+
         // Reset all concepts in the chapter
         await prisma.concept.updateMany({
             where: { chapterId },
